@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
       splash.style.opacity = '0';
       setTimeout(() => splash.remove(), 500);
     }
-  }, 1000);
+  }, 1500);
 });
 
 function initializeApp() {
@@ -145,7 +145,7 @@ function startNewGame() {
   hideOverlay();
   
   // Reset game state
-  GameState.playerDice = [1, 1, 1, 1, 1];
+  GameState.playerDice = [1, 2, 3, 4, 5];
   GameState.cpuDice = [1, 1, 1, 1, 1];
   GameState.playerHeld = [false, false, false, false, false];
   GameState.cpuHeld = [false, false, false, false, false];
@@ -172,26 +172,39 @@ function startNewGame() {
 function playerRoll() {
   if (GameState.playerRollsLeft <= 0 || !GameState.gameActive) return;
   
-  // Roll unheld dice
-  for (let i = 0; i < 5; i++) {
+  // Roll unheld dice with animation
+  const diceContainer = document.getElementById('playerDice');
+  const dice = diceContainer.querySelectorAll('.die');
+  
+  dice.forEach((die, i) => {
     if (!GameState.playerHeld[i]) {
-      GameState.playerDice[i] = rollDie();
+      die.classList.add('rolling');
+      setTimeout(() => die.classList.remove('rolling'), 500);
     }
-  }
+  });
   
-  GameState.playerRollsLeft--;
-  renderDice('player');
-  updateRollsDisplay();
-  
-  playSound('roll');
-  vibrate(50);
-  
-  if (GameState.playerRollsLeft === 0) {
-    updateStatus("Choose a category to score!");
-    document.getElementById('playerRoll').disabled = true;
-  } else {
-    updateStatus(`${GameState.playerRollsLeft} roll(s) left. Tap dice to hold them.`);
-  }
+  // Update dice values
+  setTimeout(() => {
+    for (let i = 0; i < 5; i++) {
+      if (!GameState.playerHeld[i]) {
+        GameState.playerDice[i] = rollDie();
+      }
+    }
+    
+    GameState.playerRollsLeft--;
+    renderDice('player');
+    updateRollsDisplay();
+    
+    playSound('roll');
+    vibrate(50);
+    
+    if (GameState.playerRollsLeft === 0) {
+      updateStatus("Choose a category to score! Tap any category row.");
+      document.getElementById('playerRoll').disabled = true;
+    } else {
+      updateStatus(`${GameState.playerRollsLeft} roll(s) left. Tap dice to hold them.`);
+    }
+  }, 300);
 }
 
 function rollDie() {
@@ -199,7 +212,7 @@ function rollDie() {
 }
 
 function toggleHold(player, index) {
-  if (player === 'player' && GameState.playerRollsLeft < 3) {
+  if (player === 'player' && GameState.playerRollsLeft < 3 && GameState.gameActive) {
     GameState.playerHeld[index] = !GameState.playerHeld[index];
     renderDice('player');
     playSound('hold');
@@ -214,7 +227,7 @@ function cpuTurn() {
   GameState.cpuRollsLeft = 3;
   GameState.cpuHeld = [false, false, false, false, false];
   
-  setTimeout(() => cpuRollSequence(), 800);
+  setTimeout(() => cpuRollSequence(), 1000);
 }
 
 function cpuRollSequence() {
@@ -237,9 +250,9 @@ function cpuRollSequence() {
   // CPU decision making
   if (GameState.cpuRollsLeft > 0) {
     cpuDecideHolds();
-    setTimeout(() => cpuRollSequence(), 1000);
+    setTimeout(() => cpuRollSequence(), 1200);
   } else {
-    setTimeout(() => cpuChooseCategory(), 800);
+    setTimeout(() => cpuChooseCategory(), 1000);
   }
 }
 
@@ -429,9 +442,30 @@ function createScoreRow(category) {
   const playerScored = GameState.playerScores[category.id] !== undefined;
   const cpuScored = GameState.cpuScores[category.id] !== undefined;
   
-  if (!playerScored && GameState.currentTurn === 'player' && GameState.playerRollsLeft < 3) {
+  // Make clickable if player hasn't scored and has rolled
+  if (!playerScored && 
+      GameState.currentTurn === 'player' && 
+      GameState.playerRollsLeft < 3 && 
+      GameState.gameActive) {
     row.classList.add('clickable');
-    row.addEventListener('click', () => handleCategoryClick(category.id));
+    
+    // Add click event
+    row.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleCategoryClick(category.id);
+    });
+    
+    // Add touch event for better mobile support
+    row.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleCategoryClick(category.id);
+    });
+    
+    // Show potential score
+    const potentialScore = calculateScore(category.id, GameState.playerDice);
+    row.title = `Tap to score ${potentialScore} points`;
   }
   
   row.innerHTML = `
@@ -497,6 +531,7 @@ function handleCategoryClick(categoryId) {
   if (GameState.playerScores[categoryId] !== undefined) return;
   if (!GameState.gameActive) return;
   if (GameState.currentTurn !== 'player') return;
+  if (GameState.playerRollsLeft >= 3) return;
   
   scoreCategory(categoryId, 'player');
   
@@ -525,20 +560,20 @@ function renderDice(player) {
   dice.forEach((value, index) => {
     const die = document.createElement('div');
     die.className = 'die';
+    die.setAttribute('data-value', value);
+    
     if (held[index]) die.classList.add('held');
-    die.textContent = getDieEmoji(value);
     
     if (player === 'player') {
       die.addEventListener('click', () => toggleHold('player', index));
+      die.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        toggleHold('player', index);
+      });
     }
     
     container.appendChild(die);
   });
-}
-
-function getDieEmoji(value) {
-  const emojis = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-  return emojis[value - 1] || '⚀';
 }
 
 function updateRollsDisplay() {
@@ -810,5 +845,15 @@ document.body.addEventListener('touchmove', (e) => {
     e.preventDefault();
   }
 }, { passive: false });
+
+// Prevent accidental double-tap zoom
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  if (now - lastTouchEnd <= 300) {
+    e.preventDefault();
+  }
+  lastTouchEnd = now;
+}, false);
 
 console.log('🍃 Dope Dice loaded successfully!');
