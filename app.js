@@ -1,814 +1,856 @@
-// ==================== GAME STATE ====================
-const GameState = {
-  playerDice: [1, 1, 1, 1, 1],
-  cpuDice: [1, 1, 1, 1, 1],
-  playerHeld: [false, false, false, false, false],
-  cpuHeld: [false, false, false, false, false],
-  playerRollsLeft: 3,
-  cpuRollsLeft: 3,
-  currentTurn: 'player',
-  gameActive: false,
-  playerScores: {},
-  cpuScores: {},
-  difficulty: 'medium',
-  settings: {
-    gameType: 'classic',
-    sfx: true,
-    vibration: true
-  },
-  history: [],
-  highScores: []
-};
+/* ==================== RESET & BASE ==================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-// ==================== CATEGORIES ====================
-const CATEGORIES = [
-  { id: 'ones', name: 'Ones', upper: true },
-  { id: 'twos', name: 'Twos', upper: true },
-  { id: 'threes', name: 'Threes', upper: true },
-  { id: 'fours', name: 'Fours', upper: true },
-  { id: 'fives', name: 'Fives', upper: true },
-  { id: 'sixes', name: 'Sixes', upper: true },
-  { id: 'threeKind', name: '3 of a Kind', upper: false },
-  { id: 'fourKind', name: '4 of a Kind', upper: false },
-  { id: 'fullHouse', name: 'Full House', upper: false },
-  { id: 'smallStraight', name: 'Small Straight', upper: false },
-  { id: 'largeStraight', name: 'Large Straight', upper: false },
-  { id: 'yahtzee', name: 'Yahtzee', upper: false },
-  { id: 'chance', name: 'Chance', upper: false }
-];
-
-// ==================== INITIALIZATION ====================
-document.addEventListener('DOMContentLoaded', () => {
-  initializeApp();
-  loadSettings();
-  loadHistory();
-  setupEventListeners();
-  renderScorecard();
-  showStartScreen();
+:root {
+  /* Weed Theme Colors */
+  --primary: #2b7a2b;
+  --primary-dark: #1e5a1e;
+  --primary-light: #3fa03f;
+  --accent: #7cb342;
+  --accent-dark: #558b2f;
   
-  // Hide splash after load
-  setTimeout(() => {
-    const splash = document.querySelector('.splash');
-    if (splash) {
-      splash.style.opacity = '0';
-      setTimeout(() => splash.remove(), 500);
-    }
-  }, 1000);
-});
+  /* UI Colors */
+  --bg: #0a0a0a;
+  --bg-light: #1a1a1a;
+  --bg-lighter: #2a2a2a;
+  --text: #e0e0e0;
+  --text-dim: #a0a0a0;
+  --border: #444;
+  
+  /* Player Colors */
+  --player-color: #4caf50;
+  --cpu-color: #ff6b6b;
+  
+  /* Dice */
+  --dice-bg: #2b7a2b;
+  --dice-number: #ffffff;
+  --dice-held: #7cb342;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+}
 
-function initializeApp() {
-  // Register service worker for PWA
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: var(--bg);
+}
+
+/* ==================== SPLASH SCREEN ==================== */
+.splash {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('./splash.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #1a3a1a;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+
+.splash::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(43, 122, 43, 0.3) 0%, rgba(30, 90, 30, 0.3) 100%);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.splash::after {
+  content: '🎲';
+  position: relative;
+  font-size: 80px;
+  z-index: 1;
+  animation: float 2s ease-in-out infinite;
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ==================== HEADER ==================== */
+.topbar {
+  background: linear-gradient(180deg, var(--bg-light) 0%, var(--bg) 100%);
+  border-bottom: 2px solid var(--primary);
+  padding: var(--spacing-sm) var(--spacing-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 60px;
+  flex-shrink: 0;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.app-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(43, 122, 43, 0.4);
+}
+
+.topbar h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary-light);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.controls {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.controls select,
+.controls button {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-lighter);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.controls select:hover,
+.controls button:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary);
+}
+
+.controls button {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon {
+  font-size: 1.2rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==================== MAIN GAME AREA ==================== */
+.game-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--spacing-md);
+  gap: var(--spacing-md);
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+}
+
+/* ==================== VERTICAL SCOREBOARD ==================== */
+.scoreboard-wrapper {
+  width: 100%;
+  background: var(--bg-light);
+  border-radius: 12px;
+  padding: var(--spacing-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 2px solid var(--primary-dark);
+}
+
+.scorecard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.score-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-md);
+  background: var(--bg-lighter);
+  border-radius: 6px;
+  align-items: center;
+  min-height: 48px;
+  transition: all 0.3s ease;
+}
+
+.score-header-row {
+  background: var(--primary-dark);
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cell {
+  text-align: center;
+  padding: var(--spacing-xs);
+  font-size: 1rem;
+}
+
+.cell.cat {
+  text-align: left;
+  font-weight: 500;
+}
+
+.cell.you {
+  color: var(--player-color);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.cell.cpu {
+  color: var(--cpu-color);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.score-row.clickable {
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.score-row.clickable:hover,
+.score-row.clickable:active {
+  background: var(--primary-dark);
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(43, 122, 43, 0.5);
+  border: 2px solid var(--primary-light);
+}
+
+.score-row.selected {
+  background: var(--accent-dark);
+  border: 2px solid var(--accent);
+}
+
+.score-row.upper-section {
+  border-left: 4px solid var(--accent);
+}
+
+.score-row.lower-section {
+  border-left: 4px solid var(--primary-light);
+}
+
+.score-row.bonus-row,
+.score-row.total-row {
+  background: var(--bg);
+  font-weight: 700;
+  font-size: 1.1rem;
+  border: 2px solid var(--primary);
+}
+
+.score-row.total-row {
+  background: var(--primary-dark);
+  color: #fff;
+  font-size: 1.3rem;
+  margin-top: var(--spacing-sm);
+}
+
+/* ==================== PLAYER PANEL ==================== */
+.player-panel {
+  background: var(--bg-light);
+  border-radius: 12px;
+  padding: var(--spacing-lg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 2px solid var(--primary);
+}
+
+.player-panel h2 {
+  font-size: 1.3rem;
+  margin-bottom: var(--spacing-md);
+  color: var(--primary-light);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.cpu-hidden {
+  display: none;
+}
+
+/* ==================== DICE WITH POT LEAF DESIGN ==================== */
+.dice-row {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-lg);
+  min-height: 90px;
+}
+
+.die {
+  width: 70px;
+  height: 70px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent-dark) 100%);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+  border: 3px solid var(--primary-dark);
+  position: relative;
+  user-select: none;
+  padding: 8px;
+}
+
+.die::before {
+  content: '🍃';
+  font-size: 2rem;
+  position: absolute;
+  opacity: 0.3;
+  z-index: 0;
+}
+
+.die::after {
+  content: attr(data-value);
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--dice-number);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  z-index: 1;
+  position: relative;
+}
+
+.die:active {
+  transform: scale(0.95);
+}
+
+.die.held {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--primary-light) 100%);
+  border-color: #fff;
+  box-shadow: 0 0 20px rgba(124, 179, 66, 0.8);
+  animation: pulse-glow 1s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(124, 179, 66, 0.8);
   }
-  
-  // Initialize dice displays
-  renderDice('player');
-  renderDice('cpu');
-  updateStatus('Welcome to Dope Dice!');
-}
-
-// ==================== EVENT LISTENERS ====================
-function setupEventListeners() {
-  // Menu buttons
-  document.getElementById('btnPlay').addEventListener('click', startNewGame);
-  document.getElementById('btnSettings').addEventListener('click', () => showPanel('settingsPanel'));
-  document.getElementById('btnAbout').addEventListener('click', () => showPanel('aboutPanel'));
-  document.getElementById('openStart').addEventListener('click', showStartScreen);
-  document.getElementById('historyBtn').addEventListener('click', () => {
-    loadHistory();
-    showPanel('historyPanel');
-  });
-  
-  // Back buttons
-  document.getElementById('settingsBack').addEventListener('click', () => showPanel('startPanel'));
-  document.getElementById('aboutBack').addEventListener('click', () => showPanel('startPanel'));
-  document.getElementById('historyBack').addEventListener('click', () => showPanel('startPanel'));
-  
-  // Clear history
-  document.getElementById('clearHistory').addEventListener('click', clearHistory);
-  
-  // Settings
-  document.getElementById('difficulty').addEventListener('change', (e) => {
-    GameState.difficulty = e.target.value;
-    saveSettings();
-  });
-  
-  document.getElementById('gameType').addEventListener('change', (e) => {
-    GameState.settings.gameType = e.target.value;
-    saveSettings();
-  });
-  
-  document.getElementById('sfxToggle').addEventListener('change', (e) => {
-    GameState.settings.sfx = e.target.value === 'on';
-    saveSettings();
-  });
-  
-  document.getElementById('vibrationToggle').addEventListener('change', (e) => {
-    GameState.settings.vibration = e.target.value === 'on';
-    saveSettings();
-  });
-  
-  // Roll button
-  document.getElementById('playerRoll').addEventListener('click', playerRoll);
-}
-
-// ==================== PANEL MANAGEMENT ====================
-function showPanel(panelId) {
-  const panels = document.querySelectorAll('.panel');
-  panels.forEach(p => {
-    p.classList.add('hidden');
-    p.setAttribute('aria-hidden', 'true');
-  });
-  
-  const panel = document.getElementById(panelId);
-  panel.classList.remove('hidden');
-  panel.setAttribute('aria-hidden', 'false');
-  
-  const overlay = document.getElementById('overlay');
-  overlay.classList.remove('hidden');
-  overlay.setAttribute('aria-hidden', 'false');
-}
-
-function hideOverlay() {
-  const overlay = document.getElementById('overlay');
-  overlay.classList.add('hidden');
-  overlay.setAttribute('aria-hidden', 'true');
-}
-
-function showStartScreen() {
-  showPanel('startPanel');
-}
-
-// ==================== GAME LOGIC ====================
-function startNewGame() {
-  hideOverlay();
-  
-  // Reset game state
-  GameState.playerDice = [1, 1, 1, 1, 1];
-  GameState.cpuDice = [1, 1, 1, 1, 1];
-  GameState.playerHeld = [false, false, false, false, false];
-  GameState.cpuHeld = [false, false, false, false, false];
-  GameState.playerRollsLeft = 3;
-  GameState.cpuRollsLeft = 3;
-  GameState.currentTurn = 'player';
-  GameState.gameActive = true;
-  GameState.playerScores = {};
-  GameState.cpuScores = {};
-  
-  renderScorecard();
-  renderDice('player');
-  renderDice('cpu');
-  updateRollsDisplay();
-  updateStatus("Your turn! Roll the dice to start.");
-  
-  document.getElementById('playerRoll').disabled = false;
-  document.getElementById('finalScore').textContent = '';
-  
-  playSound('start');
-  vibrate(100);
-}
-
-function playerRoll() {
-  if (GameState.playerRollsLeft <= 0 || !GameState.gameActive) return;
-  
-  // Roll unheld dice
-  for (let i = 0; i < 5; i++) {
-    if (!GameState.playerHeld[i]) {
-      GameState.playerDice[i] = rollDie();
-    }
-  }
-  
-  GameState.playerRollsLeft--;
-  renderDice('player');
-  updateRollsDisplay();
-  
-  playSound('roll');
-  vibrate(50);
-  
-  if (GameState.playerRollsLeft === 0) {
-    updateStatus("Choose a category to score!");
-    document.getElementById('playerRoll').disabled = true;
-  } else {
-    updateStatus(`${GameState.playerRollsLeft} roll(s) left. Tap dice to hold them.`);
-  }
-}
-
-function rollDie() {
-  return Math.floor(Math.random() * 6) + 1;
-}
-
-function toggleHold(player, index) {
-  if (player === 'player' && GameState.playerRollsLeft < 3) {
-    GameState.playerHeld[index] = !GameState.playerHeld[index];
-    renderDice('player');
-    playSound('hold');
-    vibrate(30);
-  }
-}
-
-// ==================== CPU AI ====================
-function cpuTurn() {
-  updateStatus("CPU is thinking...");
-  GameState.currentTurn = 'cpu';
-  GameState.cpuRollsLeft = 3;
-  GameState.cpuHeld = [false, false, false, false, false];
-  
-  setTimeout(() => cpuRollSequence(), 800);
-}
-
-function cpuRollSequence() {
-  if (GameState.cpuRollsLeft <= 0) {
-    cpuChooseCategory();
-    return;
-  }
-  
-  // Roll unheld dice
-  for (let i = 0; i < 5; i++) {
-    if (!GameState.cpuHeld[i]) {
-      GameState.cpuDice[i] = rollDie();
-    }
-  }
-  
-  GameState.cpuRollsLeft--;
-  renderDice('cpu');
-  playSound('roll');
-  
-  // CPU decision making
-  if (GameState.cpuRollsLeft > 0) {
-    cpuDecideHolds();
-    setTimeout(() => cpuRollSequence(), 1000);
-  } else {
-    setTimeout(() => cpuChooseCategory(), 800);
-  }
-}
-
-function cpuDecideHolds() {
-  const dice = GameState.cpuDice;
-  const counts = {};
-  
-  dice.forEach(d => counts[d] = (counts[d] || 0) + 1);
-  
-  // Strategy based on difficulty
-  const difficulty = GameState.difficulty;
-  
-  if (difficulty === 'easy') {
-    // Random holds
-    GameState.cpuHeld = dice.map(() => Math.random() > 0.6);
-  } else if (difficulty === 'medium') {
-    // Hold pairs and better
-    GameState.cpuHeld = dice.map(d => counts[d] >= 2);
-  } else {
-    // Optimal strategy
-    const bestValue = Object.keys(counts).reduce((a, b) => 
-      counts[a] > counts[b] ? a : b
-    );
-    GameState.cpuHeld = dice.map(d => d == bestValue);
-  }
-}
-
-function cpuChooseCategory() {
-  const availableCategories = CATEGORIES.filter(cat => 
-    GameState.cpuScores[cat.id] === undefined
-  );
-  
-  if (availableCategories.length === 0) {
-    endGame();
-    return;
-  }
-  
-  // Choose best scoring category
-  let bestCat = availableCategories[0];
-  let bestScore = calculateScore(bestCat.id, GameState.cpuDice);
-  
-  availableCategories.forEach(cat => {
-    const score = calculateScore(cat.id, GameState.cpuDice);
-    if (score > bestScore) {
-      bestScore = score;
-      bestCat = cat;
-    }
-  });
-  
-  scoreCategory(bestCat.id, 'cpu');
-  updateStatus(`CPU scored ${bestScore} in ${bestCat.name}`);
-  
-  setTimeout(() => {
-    if (checkGameOver()) {
-      endGame();
-    } else {
-      startPlayerTurn();
-    }
-  }, 1500);
-}
-
-function startPlayerTurn() {
-  GameState.currentTurn = 'player';
-  GameState.playerRollsLeft = 3;
-  GameState.playerHeld = [false, false, false, false, false];
-  renderDice('player');
-  updateRollsDisplay();
-  updateStatus("Your turn! Roll the dice.");
-  document.getElementById('playerRoll').disabled = false;
-}
-
-// ==================== SCORING ====================
-function scoreCategory(categoryId, player) {
-  const dice = player === 'player' ? GameState.playerDice : GameState.cpuDice;
-  const score = calculateScore(categoryId, dice);
-  
-  if (player === 'player') {
-    GameState.playerScores[categoryId] = score;
-  } else {
-    GameState.cpuScores[categoryId] = score;
-  }
-  
-  renderScorecard();
-  playSound('score');
-  vibrate(100);
-}
-
-function calculateScore(categoryId, dice) {
-  const counts = {};
-  dice.forEach(d => counts[d] = (counts[d] || 0) + 1);
-  const sum = dice.reduce((a, b) => a + b, 0);
-  
-  switch (categoryId) {
-    case 'ones': return dice.filter(d => d === 1).length * 1;
-    case 'twos': return dice.filter(d => d === 2).length * 2;
-    case 'threes': return dice.filter(d => d === 3).length * 3;
-    case 'fours': return dice.filter(d => d === 4).length * 4;
-    case 'fives': return dice.filter(d => d === 5).length * 5;
-    case 'sixes': return dice.filter(d => d === 6).length * 6;
-    
-    case 'threeKind':
-      return Object.values(counts).some(c => c >= 3) ? sum : 0;
-    
-    case 'fourKind':
-      return Object.values(counts).some(c => c >= 4) ? sum : 0;
-    
-    case 'fullHouse':
-      const hasThree = Object.values(counts).some(c => c === 3);
-      const hasTwo = Object.values(counts).some(c => c === 2);
-      return (hasThree && hasTwo) ? 25 : 0;
-    
-    case 'smallStraight':
-      const sorted = [...new Set(dice)].sort();
-      const straights = [
-        [1,2,3,4], [2,3,4,5], [3,4,5,6]
-      ];
-      return straights.some(s => s.every(n => sorted.includes(n))) ? 30 : 0;
-    
-    case 'largeStraight':
-      const sortedStr = dice.slice().sort().join('');
-      return (sortedStr === '12345' || sortedStr === '23456') ? 40 : 0;
-    
-    case 'yahtzee':
-      return Object.values(counts).some(c => c === 5) ? 50 : 0;
-    
-    case 'chance':
-      return sum;
-    
-    default:
-      return 0;
-  }
-}
-
-function getPlayerTotal(player) {
-  const scores = player === 'player' ? GameState.playerScores : GameState.cpuScores;
-  
-  // Upper section
-  let upperTotal = 0;
-  ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes'].forEach(cat => {
-    if (scores[cat] !== undefined) upperTotal += scores[cat];
-  });
-  
-  // Upper bonus
-  const bonus = upperTotal >= 63 ? 35 : 0;
-  
-  // Lower section
-  let lowerTotal = 0;
-  ['threeKind', 'fourKind', 'fullHouse', 'smallStraight', 'largeStraight', 'yahtzee', 'chance'].forEach(cat => {
-    if (scores[cat] !== undefined) lowerTotal += scores[cat];
-  });
-  
-  return upperTotal + bonus + lowerTotal;
-}
-
-// ==================== RENDERING ====================
-function renderScorecard() {
-  const container = document.getElementById('scoreRows');
-  container.innerHTML = '';
-  
-  // Upper section
-  CATEGORIES.filter(c => c.upper).forEach(cat => {
-    const row = createScoreRow(cat);
-    container.appendChild(row);
-  });
-  
-  // Upper bonus
-  const bonusRow = createBonusRow();
-  container.appendChild(bonusRow);
-  
-  // Lower section
-  CATEGORIES.filter(c => !c.upper).forEach(cat => {
-    const row = createScoreRow(cat);
-    container.appendChild(row);
-  });
-  
-  // Total
-  const totalRow = createTotalRow();
-  container.appendChild(totalRow);
-}
-
-function createScoreRow(category) {
-  const row = document.createElement('div');
-  row.className = 'score-row';
-  row.classList.add(category.upper ? 'upper-section' : 'lower-section');
-  row.setAttribute('role', 'row');
-  
-  const playerScored = GameState.playerScores[category.id] !== undefined;
-  const cpuScored = GameState.cpuScores[category.id] !== undefined;
-  
-  if (!playerScored && GameState.currentTurn === 'player' && GameState.playerRollsLeft < 3) {
-    row.classList.add('clickable');
-    row.addEventListener('click', () => handleCategoryClick(category.id));
-  }
-  
-  row.innerHTML = `
-    <div class="cell cat" role="cell">${category.name}</div>
-    <div class="cell you" role="cell">
-      ${playerScored ? GameState.playerScores[category.id] : '-'}
-    </div>
-    <div class="cell cpu" role="cell">
-      ${cpuScored ? GameState.cpuScores[category.id] : '-'}
-    </div>
-  `;
-  
-  return row;
-}
-
-function createBonusRow() {
-  const row = document.createElement('div');
-  row.className = 'score-row bonus-row';
-  row.setAttribute('role', 'row');
-  
-  let playerUpper = 0;
-  let cpuUpper = 0;
-  
-  ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes'].forEach(cat => {
-    if (GameState.playerScores[cat] !== undefined) {
-      playerUpper += GameState.playerScores[cat];
-    }
-    if (GameState.cpuScores[cat] !== undefined) {
-      cpuUpper += GameState.cpuScores[cat];
-    }
-  });
-  
-  const playerBonus = playerUpper >= 63 ? 35 : 0;
-  const cpuBonus = cpuUpper >= 63 ? 35 : 0;
-  
-  row.innerHTML = `
-    <div class="cell cat" role="cell">Bonus (63+)</div>
-    <div class="cell you" role="cell">${playerBonus}</div>
-    <div class="cell cpu" role="cell">${cpuBonus}</div>
-  `;
-  
-  return row;
-}
-
-function createTotalRow() {
-  const row = document.createElement('div');
-  row.className = 'score-row total-row';
-  row.setAttribute('role', 'row');
-  
-  const playerTotal = getPlayerTotal('player');
-  const cpuTotal = getPlayerTotal('cpu');
-  
-  row.innerHTML = `
-    <div class="cell cat" role="cell">TOTAL</div>
-    <div class="cell you" role="cell">${playerTotal}</div>
-    <div class="cell cpu" role="cell">${cpuTotal}</div>
-  `;
-  
-  return row;
-}
-
-function handleCategoryClick(categoryId) {
-  if (GameState.playerScores[categoryId] !== undefined) return;
-  if (!GameState.gameActive) return;
-  if (GameState.currentTurn !== 'player') return;
-  
-  scoreCategory(categoryId, 'player');
-  
-  const score = GameState.playerScores[categoryId];
-  const catName = CATEGORIES.find(c => c.id === categoryId).name;
-  updateStatus(`You scored ${score} in ${catName}!`);
-  
-  document.getElementById('playerRoll').disabled = true;
-  
-  setTimeout(() => {
-    if (checkGameOver()) {
-      endGame();
-    } else {
-      cpuTurn();
-    }
-  }, 1000);
-}
-
-function renderDice(player) {
-  const dice = player === 'player' ? GameState.playerDice : GameState.cpuDice;
-  const held = player === 'player' ? GameState.playerHeld : GameState.cpuHeld;
-  const container = document.getElementById(player === 'player' ? 'playerDice' : 'cpuDice');
-  
-  container.innerHTML = '';
-  
-  dice.forEach((value, index) => {
-    const die = document.createElement('div');
-    die.className = 'die';
-    if (held[index]) die.classList.add('held');
-    die.textContent = getDieEmoji(value);
-    
-    if (player === 'player') {
-      die.addEventListener('click', () => toggleHold('player', index));
-    }
-    
-    container.appendChild(die);
-  });
-}
-
-function getDieEmoji(value) {
-  const emojis = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-  return emojis[value - 1] || '⚀';
-}
-
-function updateRollsDisplay() {
-  document.getElementById('playerRollsLeft').textContent = GameState.playerRollsLeft;
-  document.getElementById('cpuRollsLeft').textContent = GameState.cpuRollsLeft;
-}
-
-function updateStatus(message) {
-  document.getElementById('status').textContent = message;
-}
-
-// ==================== GAME END ====================
-function checkGameOver() {
-  const allPlayerScored = CATEGORIES.every(cat => 
-    GameState.playerScores[cat.id] !== undefined
-  );
-  const allCpuScored = CATEGORIES.every(cat => 
-    GameState.cpuScores[cat.id] !== undefined
-  );
-  
-  return allPlayerScored && allCpuScored;
-}
-
-function endGame() {
-  GameState.gameActive = false;
-  
-  const playerTotal = getPlayerTotal('player');
-  const cpuTotal = getPlayerTotal('cpu');
-  
-  let result = '';
-  if (playerTotal > cpuTotal) {
-    result = `🎉 You Win! ${playerTotal} - ${cpuTotal}`;
-    playSound('win');
-    showParticles();
-  } else if (cpuTotal > playerTotal) {
-    result = `CPU Wins! ${cpuTotal} - ${playerTotal}`;
-    playSound('lose');
-  } else {
-    result = `Tie Game! ${playerTotal} - ${playerTotal}`;
-  }
-  
-  document.getElementById('finalScore').textContent = result;
-  updateStatus('Game Over! Click Menu to play again.');
-  
-  // Save to history
-  saveGameResult(playerTotal, cpuTotal, playerTotal > cpuTotal);
-  
-  vibrate([100, 50, 100]);
-}
-
-// ==================== HISTORY & STORAGE ====================
-function saveGameResult(playerScore, cpuScore, playerWon) {
-  const result = {
-    date: new Date().toISOString(),
-    playerScore,
-    cpuScore,
-    playerWon,
-    difficulty: GameState.difficulty
-  };
-  
-  GameState.history.unshift(result);
-  if (GameState.history.length > 20) GameState.history.pop();
-  
-  // Update high scores
-  if (!GameState.highScores.find(s => s.score === playerScore) || GameState.highScores.length < 10) {
-    GameState.highScores.push({ score: playerScore, date: result.date });
-    GameState.highScores.sort((a, b) => b.score - a.score);
-    GameState.highScores = GameState.highScores.slice(0, 10);
-  }
-  
-  localStorage.setItem('dopeDiceHistory', JSON.stringify(GameState.history));
-  localStorage.setItem('dopeDiceHighScores', JSON.stringify(GameState.highScores));
-}
-
-function loadHistory() {
-  try {
-    const history = localStorage.getItem('dopeDiceHistory');
-    const highScores = localStorage.getItem('dopeDiceHighScores');
-    
-    if (history) GameState.history = JSON.parse(history);
-    if (highScores) GameState.highScores = JSON.parse(highScores);
-    
-    renderHistory();
-  } catch (e) {
-    console.error('Error loading history:', e);
+  50% { 
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(124, 179, 66, 1);
   }
 }
 
-function renderHistory() {
-  const historyList = document.getElementById('historyList');
-  const highScoresList = document.getElementById('highScoresList');
-  
-  if (GameState.history.length === 0) {
-    historyList.innerHTML = '<div class="muted">No games played yet</div>';
-  } else {
-    historyList.innerHTML = GameState.history.slice(0, 10).map(game => {
-      const date = new Date(game.date).toLocaleDateString();
-      const result = game.playerWon ? '🏆 Win' : '❌ Loss';
-      return `
-        <div class="history-item">
-          <strong>${result}</strong> - ${game.playerScore} vs ${game.cpuScore}
-          <br><small>${date} • ${game.difficulty}</small>
-        </div>
-      `;
-    }).join('');
+.die.rolling {
+  animation: rollDice 0.5s ease;
+}
+
+@keyframes rollDice {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(90deg) scale(1.1); }
+  50% { transform: rotate(180deg) scale(0.9); }
+  75% { transform: rotate(270deg) scale(1.1); }
+}
+
+/* ==================== ROLL CONTROLS ==================== */
+.roll-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.roll-btn,
+#playerRoll {
+  width: 100%;
+  max-width: 300px;
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-size: 1.2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(43, 122, 43, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.roll-btn:hover,
+#playerRoll:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(43, 122, 43, 0.6);
+}
+
+.roll-btn:active,
+#playerRoll:active {
+  transform: translateY(0);
+}
+
+.roll-btn:disabled,
+#playerRoll:disabled {
+  background: var(--bg-lighter);
+  color: var(--text-dim);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.rolls-left {
+  font-size: 1.1rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.rolls-count {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 1.4rem;
+}
+
+/* ==================== FOOTER ==================== */
+.statusbar {
+  background: var(--bg-light);
+  border-top: 2px solid var(--primary);
+  padding: var(--spacing-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 50px;
+}
+
+#status {
+  font-weight: 500;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.final-score {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--accent);
+}
+
+/* ==================== PARTICLES ==================== */
+.particle-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.particle-canvas.active {
+  opacity: 1;
+}
+
+/* ==================== OVERLAY & PANELS ==================== */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.panel {
+  background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg) 100%);
+  border: 2px solid var(--primary);
+  border-radius: 16px;
+  padding: var(--spacing-xl);
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(43, 122, 43, 0.3);
+  transform: scale(1);
+  transition: transform 0.3s ease;
+}
+
+.panel.hidden {
+  display: none;
+}
+
+.panel h2,
+.panel h3 {
+  color: var(--primary-light);
+  margin-bottom: var(--spacing-lg);
+  text-align: center;
+  font-size: 2rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.panel h3 {
+  font-size: 1.5rem;
+}
+
+.panel h4 {
+  color: var(--accent);
+  margin-top: var(--spacing-lg);
+  margin-bottom: var(--spacing-sm);
+  font-size: 1.1rem;
+}
+
+.start-icon {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto var(--spacing-lg);
+  display: block;
+  border-radius: 24px;
+  box-shadow: 0 8px 24px rgba(43, 122, 43, 0.5);
+  animation: float 3s ease-in-out infinite;
+}
+
+.lead {
+  text-align: center;
+  font-size: 1.1rem;
+  color: var(--text-dim);
+  margin-bottom: var(--spacing-xl);
+  line-height: 1.6;
+}
+
+.start-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.start-buttons button {
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-size: 1.1rem;
+  font-weight: 600;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-lighter);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 54px;
+}
+
+.start-buttons button:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(43, 122, 43, 0.4);
+}
+
+.start-buttons button:active {
+  transform: translateY(0);
+}
+
+.start-buttons button.primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  color: white;
+  border: none;
+  font-size: 1.3rem;
+  box-shadow: 0 4px 12px rgba(43, 122, 43, 0.4);
+}
+
+.start-buttons button.primary:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(43, 122, 43, 0.6);
+}
+
+.credits {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* ==================== SETTINGS ==================== */
+.setting-group {
+  margin-bottom: var(--spacing-lg);
+}
+
+.setting-group label {
+  display: block;
+  margin-bottom: var(--spacing-sm);
+  color: var(--text);
+  font-weight: 500;
+  font-size: 1rem;
+}
+
+.setting-group select {
+  width: 100%;
+  padding: var(--spacing-md);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-lighter);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  min-height: 48px;
+}
+
+.setting-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(43, 122, 43, 0.2);
+}
+
+.settings-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xl);
+  flex-wrap: wrap;
+}
+
+.settings-actions button {
+  flex: 1;
+  min-width: 120px;
+  padding: var(--spacing-md);
+  font-size: 1rem;
+  font-weight: 600;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-lighter);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 48px;
+}
+
+.settings-actions button:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary);
+}
+
+.btn-back {
+  background: var(--primary) !important;
+  color: white !important;
+  border: none !important;
+}
+
+.btn-danger {
+  background: #d32f2f !important;
+  color: white !important;
+  border: none !important;
+}
+
+.btn-danger:hover {
+  background: #b71c1c !important;
+}
+
+/* ==================== ABOUT ==================== */
+.about-content ul {
+  list-style: none;
+  padding: 0;
+  margin-bottom: var(--spacing-lg);
+}
+
+.about-content li {
+  padding: var(--spacing-sm) 0;
+  padding-left: var(--spacing-lg);
+  position: relative;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.about-content li::before {
+  content: '🍃';
+  position: absolute;
+  left: 0;
+  font-size: 1rem;
+}
+
+/* ==================== HISTORY ==================== */
+.history-list,
+.highscore-list {
+  background: var(--bg-lighter);
+  border-radius: 8px;
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.history-item,
+.highscore-item {
+  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  background: var(--bg);
+  border-radius: 6px;
+  border-left: 4px solid var(--primary);
+}
+
+.history-item:last-child,
+.highscore-item:last-child {
+  margin-bottom: 0;
+}
+
+.muted {
+  color: var(--text-dim);
+  font-style: italic;
+  text-align: center;
+  padding: var(--spacing-lg);
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 480px) {
+  .topbar h1 {
+    font-size: 1.2rem;
   }
   
-  if (GameState.highScores.length === 0) {
-    highScoresList.innerHTML = '<div class="muted">No high scores yet</div>';
-  } else {
-    highScoresList.innerHTML = GameState.highScores.map((score, i) => {
-      const date = new Date(score.date).toLocaleDateString();
-      return `
-        <div class="highscore-item">
-          <strong>#${i + 1}</strong> - ${score.score} points
-          <br><small>${date}</small>
-        </div>
-      `;
-    }).join('');
+  .app-icon {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .controls {
+    gap: var(--spacing-xs);
+  }
+  
+  .controls select,
+  .controls button {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.85rem;
+    min-width: 40px;
+    min-height: 40px;
+  }
+  
+  .die {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .die::before {
+    font-size: 1.5rem;
+  }
+  
+  .die::after {
+    font-size: 1.8rem;
+  }
+  
+  .panel {
+    padding: var(--spacing-lg);
+  }
+  
+  .start-icon {
+    width: 80px;
+    height: 80px;
   }
 }
 
-function clearHistory() {
-  if (confirm('Clear all game history and high scores?')) {
-    GameState.history = [];
-    GameState.highScores = [];
-    localStorage.removeItem('dopeDiceHistory');
-    localStorage.removeItem('dopeDiceHighScores');
-    renderHistory();
-    playSound('click');
+/* ==================== ANIMATIONS ==================== */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-// ==================== SETTINGS ====================
-function saveSettings() {
-  localStorage.setItem('dopeDiceSettings', JSON.stringify(GameState.settings));
-  localStorage.setItem('dopeDiceDifficulty', GameState.difficulty);
+.score-row {
+  animation: slideIn 0.3s ease;
 }
 
-function loadSettings() {
-  try {
-    const settings = localStorage.getItem('dopeDiceSettings');
-    const difficulty = localStorage.getItem('dopeDiceDifficulty');
-    
-    if (settings) {
-      GameState.settings = JSON.parse(settings);
-      document.getElementById('gameType').value = GameState.settings.gameType;
-      document.getElementById('sfxToggle').value = GameState.settings.sfx ? 'on' : 'off';
-      document.getElementById('vibrationToggle').value = GameState.settings.vibration ? 'on' : 'off';
-    }
-    
-    if (difficulty) {
-      GameState.difficulty = difficulty;
-      document.getElementById('difficulty').value = difficulty;
-    }
-  } catch (e) {
-    console.error('Error loading settings:', e);
-  }
+/* ==================== SCROLLBAR ==================== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-// ==================== AUDIO & HAPTICS ====================
-function playSound(type) {
-  if (!GameState.settings.sfx) return;
-  
-  const frequencies = {
-    roll: 200,
-    hold: 300,
-    score: 400,
-    win: 500,
-    lose: 150,
-    click: 250,
-    start: 350
-  };
-  
-  try {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.value = frequencies[type] || 300;
-    oscillator.type = 'sine';
-    
-    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.1);
-  } catch (e) {
-    // Audio not supported
-  }
+::-webkit-scrollbar-track {
+  background: var(--bg);
 }
 
-function vibrate(pattern) {
-  if (!GameState.settings.vibration) return;
-  if ('vibrate' in navigator) {
-    navigator.vibrate(pattern);
-  }
+::-webkit-scrollbar-thumb {
+  background: var(--primary-dark);
+  border-radius: 4px;
 }
 
-// ==================== PARTICLES ====================
-function showParticles() {
-  const canvas = document.getElementById('particleCanvas');
-  const ctx = canvas.getContext('2d');
-  
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  canvas.classList.add('active');
-  
-  const particles = [];
-  const particleCount = 50;
-  
-  for (let i = 0; i < particleCount; i++) {
-    particles.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      vx: (Math.random() - 0.5) * 4,
-      vy: (Math.random() - 0.5) * 4,
-      size: Math.random() * 6 + 2,
-      color: `hsl(${Math.random() * 60 + 90}, 70%, 50%)`
-    });
-  }
-  
-  let animationId;
-  let frame = 0;
-  
-  function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    particles.forEach(p => {
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.1;
-      
-      ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    
-    frame++;
-    if (frame < 200) {
-      animationId = requestAnimationFrame(animate);
-    } else {
-      canvas.classList.remove('active');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-  }
-  
-  animate();
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
 }
-
-// ==================== UTILITIES ====================
-window.addEventListener('resize', () => {
-  const canvas = document.getElementById('particleCanvas');
-  if (canvas) {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-  }
-});
-
-// Prevent pull-to-refresh on mobile
-document.body.addEventListener('touchmove', (e) => {
-  if (e.target.closest('.game-area') || e.target.closest('.panel')) {
-    // Allow scrolling in these areas
-  } else {
-    e.preventDefault();
-  }
-}, { passive: false });
-
-console.log('🍃 Dope Dice loaded successfully!');
