@@ -1,346 +1,475 @@
-// ==================== GAME STATE ====================
-const GameState = {
-  playerDice: [1, 1, 1, 1, 1],
-  cpuDice: [1, 1, 1, 1, 1],
-  playerHeld: [false, false, false, false, false],
-  cpuHeld: [false, false, false, false, false],
-  playerRollsLeft: 3,
-  cpuRollsLeft: 3,
-  currentTurn: 'player',
-  gameActive: false,
-  playerScores: {},
-  cpuScores: {},
-  difficulty: 'medium',
-  settings: {
-    gameType: 'classic',
-    sfx: true,
-    vibration: true
-  },
-  history: [],
-  highScores: []
-};
+/ ==================== DOPE DICE v2.0 - ENHANCED ====================
+// Complete Yahtzee Game Engine with Advanced Features
 
-// ==================== CATEGORIES ====================
-const CATEGORIES = [
-  { id: 'ones', name: 'Ones', upper: true },
-  { id: 'twos', name: 'Twos', upper: true },
-  { id: 'threes', name: 'Threes', upper: true },
-  { id: 'fours', name: 'Fours', upper: true },
-  { id: 'fives', name: 'Fives', upper: true },
-  { id: 'sixes', name: 'Sixes', upper: true },
-  { id: 'threeKind', name: '3 of a Kind', upper: false },
-  { id: 'fourKind', name: '4 of a Kind', upper: false },
-  { id: 'fullHouse', name: 'Full House', upper: false },
-  { id: 'smallStraight', name: 'Small Straight', upper: false },
-  { id: 'largeStraight', name: 'Large Straight', upper: false },
-  { id: 'yahtzee', name: 'Yahtzee', upper: false },
-  { id: 'chance', name: 'Chance', upper: false }
-];
+const Game = {
+  state: {
+    // Player state
+    playerDice: [1, 2, 3, 4, 5],
+    playerHeld: [false, false, false, false, false],
+    playerRollsLeft: 3,
+    playerScores: {},
+    
+    // CPU state
+    cpuDice: [1, 1, 1, 1, 1],
+    cpuHeld: [false, false, false, false, false],
+    cpuRollsLeft: 3,
+    cpuScores: {},
+    
+    // Game state
+    currentTurn: 'player',
+    gameActive: false,
+    difficulty: 'medium',
+    roundNumber: 1,
+    
+    // Settings
+    settings: {
+      sound: true,
+      vibration: true,
+      theme: 'green',
+      animations: true
+    },
+    
+    // Stats
+    history: [],
+    highScores: [],
+    stats: {
+      gamesPlayed: 0,
+      gamesWon: 0,
+      yahtzees: 0,
+      totalScore: 0
+    }
+  },
+  
+  categories: [
+    { id: 'ones', name: 'Ones', type: 'upper', hint: 'Sum of all 1s' },
+    { id: 'twos', name: 'Twos', type: 'upper', hint: 'Sum of all 2s' },
+    { id: 'threes', name: 'Threes', type: 'upper', hint: 'Sum of all 3s' },
+    { id: 'fours', name: 'Fours', type: 'upper', hint: 'Sum of all 4s' },
+    { id: 'fives', name: 'Fives', type: 'upper', hint: 'Sum of all 5s' },
+    { id: 'sixes', name: 'Sixes', type: 'upper', hint: 'Sum of all 6s' },
+    { id: 'threeKind', name: '3 of a Kind', type: 'lower', hint: 'At least 3 same dice' },
+    { id: 'fourKind', name: '4 of a Kind', type: 'lower', hint: 'At least 4 same dice' },
+    { id: 'fullHouse', name: 'Full House', type: 'lower', hint: '3 of one + 2 of another' },
+    { id: 'smallStraight', name: 'Small Straight', type: 'lower', hint: '4 consecutive dice' },
+    { id: 'largeStraight', name: 'Large Straight', type: 'lower', hint: '5 consecutive dice' },
+    { id: 'yahtzee', name: 'Yahtzee', type: 'lower', hint: 'All 5 dice the same!' },
+    { id: 'chance', name: 'Chance', type: 'lower', hint: 'Sum of all dice' }
+  ],
+  
+  init() {
+    this.loadAllData();
+    this.setupEventListeners();
+    this.renderScoreboard();
+    this.updateDiceDisplay();
+    this.hideSplash();
+    this.setStatus('Welcome to Dope Dice! 🍃 Tap New Game to start.');
+  },
+  
+  loadAllData() {
+    this.loadSettings();
+    this.loadHistory();
+    this.loadStats();
+  },
+  
+  hideSplash() {
+    setTimeout(() => {
+      const splash = document.getElementById('splash');
+      if (splash) {
+        splash.classList.add('hidden');
+        setTimeout(() => splash.remove(), 500);
+      }
+    }, 1500);
+  }
+};
 
 // ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', () => {
-  initializeApp();
-  loadSettings();
-  loadHistory();
-  setupEventListeners();
-  renderScorecard();
-  showStartScreen();
-  
-  // Hide splash after load
-  setTimeout(() => {
-    const splash = document.querySelector('.splash');
-    if (splash) {
-      splash.style.opacity = '0';
-      setTimeout(() => splash.remove(), 500);
+  try {
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('✅ Service Worker registered'))
+        .catch(err => console.log('❌ SW registration failed:', err));
     }
-  }, 1500);
+    
+    // Initialize game
+    Game.init();
+    
+  } catch (error) {
+    console.error('❌ Initialization error:', error);
+    alert('Error starting game. Please refresh the page.');
+  }
 });
 
-function initializeApp() {
-  // Register service worker for PWA
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+// ==================== EVENT LISTENERS ====================
+Game.setupEventListeners = function() {
+  // Menu button
+  const menuBtn = document.getElementById('menuBtn');
+  if (menuBtn) {
+    menuBtn.addEventListener('click', () => this.showOverlay('menuOverlay'));
   }
   
-  // Initialize dice displays
-  renderDice('player');
-  renderDice('cpu');
-  updateStatus('Welcome to Dope Dice!');
-}
-
-// ==================== EVENT LISTENERS ====================
-function setupEventListeners() {
-  // Menu buttons
-  document.getElementById('btnPlay').addEventListener('click', startNewGame);
-  document.getElementById('btnSettings').addEventListener('click', () => showPanel('settingsPanel'));
-  document.getElementById('btnAbout').addEventListener('click', () => showPanel('aboutPanel'));
-  document.getElementById('openStart').addEventListener('click', showStartScreen);
-  document.getElementById('historyBtn').addEventListener('click', () => {
-    loadHistory();
-    showPanel('historyPanel');
+  // Close buttons
+  const closeButtons = {
+    'closeMenu': 'menuOverlay',
+    'closeHistory': 'historyOverlay',
+    'closeSettings': 'settingsOverlay',
+    'closeAbout': 'aboutOverlay'
+  };
+  
+  Object.entries(closeButtons).forEach(([btnId, overlayId]) => {
+    const btn = document.getElementById(btnId);
+    if (btn) btn.addEventListener('click', () => this.hideOverlay(overlayId));
   });
   
-  // Back buttons
-  document.getElementById('settingsBack').addEventListener('click', () => showPanel('startPanel'));
-  document.getElementById('aboutBack').addEventListener('click', () => showPanel('startPanel'));
-  document.getElementById('historyBack').addEventListener('click', () => showPanel('startPanel'));
+  // Bottom navigation
+  const navButtons = {
+    'navNewGame': () => this.startNewGame(),
+    'navHistory': () => {
+      this.loadHistory();
+      this.showOverlay('historyOverlay');
+    },
+    'navSettings': () => this.showOverlay('settingsOverlay'),
+    'navAbout': () => this.showOverlay('aboutOverlay')
+  };
   
-  // Clear history
-  document.getElementById('clearHistory').addEventListener('click', clearHistory);
+  Object.entries(navButtons).forEach(([id, handler]) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.addEventListener('click', handler);
+  });
+  
+  // Menu options
+  const menuOptions = {
+    'menuNewGame': () => {
+      this.hideOverlay('menuOverlay');
+      this.startNewGame();
+    },
+    'menuHistory': () => {
+      this.hideOverlay('menuOverlay');
+      this.loadHistory();
+      this.showOverlay('historyOverlay');
+    },
+    'menuSettings': () => {
+      this.hideOverlay('menuOverlay');
+      this.showOverlay('settingsOverlay');
+    },
+    'menuAbout': () => {
+      this.hideOverlay('menuOverlay');
+      this.showOverlay('aboutOverlay');
+    }
+  };
+  
+  Object.entries(menuOptions).forEach(([id, handler]) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.addEventListener('click', handler);
+  });
   
   // Settings
-  document.getElementById('difficulty').addEventListener('change', (e) => {
-    GameState.difficulty = e.target.value;
-    saveSettings();
-  });
+  const difficulty = document.getElementById('difficulty');
+  if (difficulty) {
+    difficulty.addEventListener('change', (e) => {
+      this.state.difficulty = e.target.value;
+      this.saveSettings();
+      this.playSound('click');
+    });
+  }
   
-  document.getElementById('gameType').addEventListener('change', (e) => {
-    GameState.settings.gameType = e.target.value;
-    saveSettings();
-  });
+  const soundToggle = document.getElementById('soundToggle');
+  if (soundToggle) {
+    soundToggle.addEventListener('change', (e) => {
+      this.state.settings.sound = e.target.value === 'on';
+      this.saveSettings();
+      this.playSound('click');
+    });
+  }
   
-  document.getElementById('sfxToggle').addEventListener('change', (e) => {
-    GameState.settings.sfx = e.target.value === 'on';
-    saveSettings();
-  });
+  const vibrationToggle = document.getElementById('vibrationToggle');
+  if (vibrationToggle) {
+    vibrationToggle.addEventListener('change', (e) => {
+      this.state.settings.vibration = e.target.value === 'on';
+      this.saveSettings();
+      if (e.target.value === 'on') this.vibrate(50);
+    });
+  }
   
-  document.getElementById('vibrationToggle').addEventListener('change', (e) => {
-    GameState.settings.vibration = e.target.value === 'on';
-    saveSettings();
-  });
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) {
+    themeToggle.addEventListener('change', (e) => {
+      this.state.settings.theme = e.target.value;
+      this.saveSettings();
+      this.applyTheme(e.target.value);
+    });
+  }
+  
+  // Clear history
+  const clearHistoryBtn = document.getElementById('clearHistory');
+  if (clearHistoryBtn) {
+    clearHistoryBtn.addEventListener('click', () => this.clearHistory());
+  }
   
   // Roll button
-  document.getElementById('playerRoll').addEventListener('click', playerRoll);
-}
+  const rollBtn = document.getElementById('rollBtn');
+  if (rollBtn) {
+    rollBtn.addEventListener('click', () => this.playerRoll());
+  }
+};
 
-// ==================== PANEL MANAGEMENT ====================
-function showPanel(panelId) {
-  const panels = document.querySelectorAll('.panel');
-  panels.forEach(p => {
-    p.classList.add('hidden');
-    p.setAttribute('aria-hidden', 'true');
-  });
-  
-  const panel = document.getElementById(panelId);
-  panel.classList.remove('hidden');
-  panel.setAttribute('aria-hidden', 'false');
-  
-  const overlay = document.getElementById('overlay');
-  overlay.classList.remove('hidden');
-  overlay.setAttribute('aria-hidden', 'false');
-}
+// ==================== OVERLAY MANAGEMENT ====================
+Game.showOverlay = function(id) {
+  const overlay = document.getElementById(id);
+  if (overlay) {
+    overlay.classList.add('active');
+    this.playSound('click');
+  }
+};
 
-function hideOverlay() {
-  const overlay = document.getElementById('overlay');
-  overlay.classList.add('hidden');
-  overlay.setAttribute('aria-hidden', 'true');
-}
+Game.hideOverlay = function(id) {
+  const overlay = document.getElementById(id);
+  if (overlay) {
+    overlay.classList.remove('active');
+    this.playSound('click');
+  }
+};
 
-function showStartScreen() {
-  showPanel('startPanel');
-}
+Game.hideAllOverlays = function() {
+  document.querySelectorAll('.overlay').forEach(o => o.classList.remove('active'));
+};
 
-// ==================== GAME LOGIC ====================
-function startNewGame() {
-  hideOverlay();
+// ==================== GAME FLOW ====================
+Game.startNewGame = function() {
+  this.hideAllOverlays();
   
-  // Reset game state
-  GameState.playerDice = [1, 2, 3, 4, 5];
-  GameState.cpuDice = [1, 1, 1, 1, 1];
-  GameState.playerHeld = [false, false, false, false, false];
-  GameState.cpuHeld = [false, false, false, false, false];
-  GameState.playerRollsLeft = 3;
-  GameState.cpuRollsLeft = 3;
-  GameState.currentTurn = 'player';
-  GameState.gameActive = true;
-  GameState.playerScores = {};
-  GameState.cpuScores = {};
+  // Reset state
+  this.state.playerDice = [1, 2, 3, 4, 5];
+  this.state.playerHeld = [false, false, false, false, false];
+  this.state.playerRollsLeft = 3;
+  this.state.playerScores = {};
   
-  renderScorecard();
-  renderDice('player');
-  renderDice('cpu');
-  updateRollsDisplay();
-  updateStatus("Your turn! Roll the dice to start.");
+  this.state.cpuDice = [1, 1, 1, 1, 1];
+  this.state.cpuHeld = [false, false, false, false, false];
+  this.state.cpuRollsLeft = 3;
+  this.state.cpuScores = {};
   
-  document.getElementById('playerRoll').disabled = false;
-  document.getElementById('finalScore').textContent = '';
+  this.state.currentTurn = 'player';
+  this.state.gameActive = true;
+  this.state.roundNumber = 1;
   
-  playSound('start');
-  vibrate(100);
-}
+  // Update UI
+  this.renderScoreboard();
+  this.updateDiceDisplay();
+  this.updateRollsLeft();
+  this.updateTurnIndicator();
+  this.setStatus('Your turn! Roll the dice to start. 🎲');
+  
+  const gameResult = document.getElementById('gameResult');
+  if (gameResult) gameResult.textContent = '';
+  
+  const rollBtn = document.getElementById('rollBtn');
+  if (rollBtn) rollBtn.disabled = false;
+  
+  this.playSound('start');
+  this.vibrate(100);
+};
 
-function playerRoll() {
-  if (GameState.playerRollsLeft <= 0 || !GameState.gameActive) return;
+Game.playerRoll = function() {
+  if (this.state.playerRollsLeft <= 0 || !this.state.gameActive) return;
   
-  // Roll unheld dice with animation
-  const diceContainer = document.getElementById('playerDice');
-  const dice = diceContainer.querySelectorAll('.die');
+  // Add rolling animation
+  const diceContainer = document.getElementById('diceContainer');
+  if (diceContainer) {
+    const dice = diceContainer.querySelectorAll('.die');
+    dice.forEach((die, i) => {
+      if (!this.state.playerHeld[i]) {
+        die.classList.add('rolling');
+        setTimeout(() => die.classList.remove('rolling'), 600);
+      }
+    });
+  }
   
-  dice.forEach((die, i) => {
-    if (!GameState.playerHeld[i]) {
-      die.classList.add('rolling');
-      setTimeout(() => die.classList.remove('rolling'), 500);
-    }
-  });
-  
-  // Update dice values
+  // Roll unheld dice
   setTimeout(() => {
     for (let i = 0; i < 5; i++) {
-      if (!GameState.playerHeld[i]) {
-        GameState.playerDice[i] = rollDie();
+      if (!this.state.playerHeld[i]) {
+        this.state.playerDice[i] = this.rollDie();
       }
     }
     
-    GameState.playerRollsLeft--;
-    renderDice('player');
-    updateRollsDisplay();
+    this.state.playerRollsLeft--;
+    this.updateDiceDisplay();
+    this.updateRollsLeft();
     
-    playSound('roll');
-    vibrate(50);
+    this.playSound('roll');
+    this.vibrate(50);
     
-    if (GameState.playerRollsLeft === 0) {
-      updateStatus("Choose a category to score! Tap any category row.");
-      document.getElementById('playerRoll').disabled = true;
+    // Check for Yahtzee
+    if (this.isYahtzee(this.state.playerDice)) {
+      this.setStatus('🎉 YAHTZEE! Choose where to score it!');
+      this.vibrate([100, 50, 100, 50, 100]);
+    } else if (this.state.playerRollsLeft === 0) {
+      this.setStatus('Choose a category to score! Tap any available row.');
+      const rollBtn = document.getElementById('rollBtn');
+      if (rollBtn) rollBtn.disabled = true;
     } else {
-      updateStatus(`${GameState.playerRollsLeft} roll(s) left. Tap dice to hold them.`);
+      this.setStatus(`${this.state.playerRollsLeft} roll(s) left. Tap dice to hold them.`);
     }
-  }, 300);
-}
-
-function rollDie() {
-  return Math.floor(Math.random() * 6) + 1;
-}
-
-function toggleHold(player, index) {
-  if (player === 'player' && GameState.playerRollsLeft < 3 && GameState.gameActive) {
-    GameState.playerHeld[index] = !GameState.playerHeld[index];
-    renderDice('player');
-    playSound('hold');
-    vibrate(30);
-  }
-}
+    
 
 // ==================== CPU AI ====================
-function cpuTurn() {
-  updateStatus("CPU is thinking...");
-  GameState.currentTurn = 'cpu';
-  GameState.cpuRollsLeft = 3;
-  GameState.cpuHeld = [false, false, false, false, false];
+Game.cpuTurn = function() {
+  this.state.currentTurn = 'cpu';
+  this.state.cpuRollsLeft = 3;
+  this.state.cpuHeld = [false, false, false, false, false];
   
-  setTimeout(() => cpuRollSequence(), 1000);
-}
+  this.updateTurnIndicator();
+  this.setStatus('CPU is thinking... 🤔');
+  
+  setTimeout(() => this.cpuRollSequence(), 1000);
+};
 
-function cpuRollSequence() {
-  if (GameState.cpuRollsLeft <= 0) {
-    cpuChooseCategory();
+Game.cpuRollSequence = function() {
+  if (this.state.cpuRollsLeft <= 0) {
+    this.cpuChooseCategory();
     return;
   }
   
   // Roll unheld dice
   for (let i = 0; i < 5; i++) {
-    if (!GameState.cpuHeld[i]) {
-      GameState.cpuDice[i] = rollDie();
+    if (!this.state.cpuHeld[i]) {
+      this.state.cpuDice[i] = this.rollDie();
     }
   }
   
-  GameState.cpuRollsLeft--;
-  renderDice('cpu');
-  playSound('roll');
+  this.state.cpuRollsLeft--;
+  this.playSound('roll');
   
-  // CPU decision making
-  if (GameState.cpuRollsLeft > 0) {
-    cpuDecideHolds();
-    setTimeout(() => cpuRollSequence(), 1200);
+  // CPU decision
+  if (this.state.cpuRollsLeft > 0) {
+    this.cpuDecideHolds();
+    setTimeout(() => this.cpuRollSequence(), 1200);
   } else {
-    setTimeout(() => cpuChooseCategory(), 1000);
+    setTimeout(() => this.cpuChooseCategory(), 1000);
   }
-}
+};
 
-function cpuDecideHolds() {
-  const dice = GameState.cpuDice;
+Game.cpuDecideHolds = function() {
+  const dice = this.state.cpuDice;
   const counts = {};
-  
   dice.forEach(d => counts[d] = (counts[d] || 0) + 1);
   
-  // Strategy based on difficulty
-  const difficulty = GameState.difficulty;
-  
-  if (difficulty === 'easy') {
-    // Random holds
-    GameState.cpuHeld = dice.map(() => Math.random() > 0.6);
-  } else if (difficulty === 'medium') {
+  if (this.state.difficulty === 'easy') {
+    // Random strategy (40% hold chance)
+    this.state.cpuHeld = dice.map(() => Math.random() > 0.6);
+  } else if (this.state.difficulty === 'medium') {
     // Hold pairs and better
-    GameState.cpuHeld = dice.map(d => counts[d] >= 2);
+    this.state.cpuHeld = dice.map(d => counts[d] >= 2);
   } else {
-    // Optimal strategy
-    const bestValue = Object.keys(counts).reduce((a, b) => 
-      counts[a] > counts[b] ? a : b
-    );
-    GameState.cpuHeld = dice.map(d => d == bestValue);
+    // Hard: Optimal strategy
+    const maxCount = Math.max(...Object.values(counts));
+    
+    // If has 4 or 5 of a kind, hold those
+    if (maxCount >= 4) {
+      const bestValue = Object.keys(counts).find(k => counts[k] === maxCount);
+      this.state.cpuHeld = dice.map(d => d == bestValue);
+    }
+    // If has 3 of a kind, hold those
+    else if (maxCount === 3) {
+      const bestValue = Object.keys(counts).find(k => counts[k] === 3);
+      this.state.cpuHeld = dice.map(d => d == bestValue);
+    }
+    // Check for straight potential
+    else {
+      const sorted = [...new Set(dice)].sort((a, b) => a - b);
+      if (sorted.length >= 4) {
+        // Keep dice that form sequences
+        this.state.cpuHeld = dice.map(d => sorted.includes(d));
+      } else {
+        // Keep highest value pairs/singles
+        const bestValue = Object.keys(counts).reduce((a, b) => 
+          counts[a] > counts[b] || (counts[a] === counts[b] && a > b) ? a : b
+        );
+        this.state.cpuHeld = dice.map(d => d == bestValue);
+      }
+    }
   }
-}
+};
 
-function cpuChooseCategory() {
-  const availableCategories = CATEGORIES.filter(cat => 
-    GameState.cpuScores[cat.id] === undefined
+Game.cpuChooseCategory = function() {
+  const available = this.categories.filter(cat => 
+    this.state.cpuScores[cat.id] === undefined
   );
   
-  if (availableCategories.length === 0) {
-    endGame();
+  if (available.length === 0) {
+    this.endGame();
     return;
   }
   
-  // Choose best scoring category
-  let bestCat = availableCategories[0];
-  let bestScore = calculateScore(bestCat.id, GameState.cpuDice);
+  // Find best scoring option
+  let best = available[0];
+  let bestScore = this.calculateScore(best.id, this.state.cpuDice);
   
-  availableCategories.forEach(cat => {
-    const score = calculateScore(cat.id, GameState.cpuDice);
-    if (score > bestScore) {
+  available.forEach(cat => {
+    const score = this.calculateScore(cat.id, this.state.cpuDice);
+    
+    // Prioritize Yahtzee
+    if (cat.id === 'yahtzee' && score === 50) {
+      best = cat;
       bestScore = score;
-      bestCat = cat;
+    } else if (score > bestScore) {
+      bestScore = score;
+      best = cat;
     }
   });
   
-  scoreCategory(bestCat.id, 'cpu');
-  updateStatus(`CPU scored ${bestScore} in ${bestCat.name}`);
+  this.scoreCategory(best.id, 'cpu');
+  this.setStatus(`CPU scored ${bestScore} in ${best.name}`);
   
   setTimeout(() => {
-    if (checkGameOver()) {
-      endGame();
+    if (this.isGameOver()) {
+      this.endGame();
     } else {
-      startPlayerTurn();
+      this.state.roundNumber++;
+      this.startPlayerTurn();
     }
   }, 1500);
-}
+};
 
-function startPlayerTurn() {
-  GameState.currentTurn = 'player';
-  GameState.playerRollsLeft = 3;
-  GameState.playerHeld = [false, false, false, false, false];
-  renderDice('player');
-  updateRollsDisplay();
-  updateStatus("Your turn! Roll the dice.");
-  document.getElementById('playerRoll').disabled = false;
-}
+Game.startPlayerTurn = function() {
+  this.state.currentTurn = 'player';
+  this.state.playerRollsLeft = 3;
+  this.state.playerHeld = [false, false, false, false, false];
+  
+  this.updateDiceDisplay();
+  this.updateRollsLeft();
+  this.updateTurnIndicator();
+  this.renderScoreboard();
+  this.setStatus(`Round ${this.state.roundNumber} - Your turn! Roll the dice.`);
+  
+  const rollBtn = document.getElementById('rollBtn');
+  if (rollBtn) rollBtn.disabled = false;
+};
 
-// ==================== SCORING ====================
-function scoreCategory(categoryId, player) {
-  const dice = player === 'player' ? GameState.playerDice : GameState.cpuDice;
-  const score = calculateScore(categoryId, dice);
+// ==================== SCORING ENGINE ====================
+Game.scoreCategory = function(categoryId, player) {
+  const dice = player === 'player' ? this.state.playerDice : this.state.cpuDice;
+  const score = this.calculateScore(categoryId, dice);
   
   if (player === 'player') {
-    GameState.playerScores[categoryId] = score;
+    this.state.playerScores[categoryId] = score;
+    
+    // Track yahtzees
+    if (categoryId === 'yahtzee' && score === 50) {
+      this.state.stats.yahtzees++;
+    }
   } else {
-    GameState.cpuScores[categoryId] = score;
+    this.state.cpuScores[categoryId] = score;
   }
   
-  renderScorecard();
-  playSound('score');
-  vibrate(100);
-}
+  this.renderScoreboard();
+  this.playSound('score');
+  this.vibrate(100);
+};
 
-function calculateScore(categoryId, dice) {
+Game.calculateScore = function(categoryId, dice) {
   const counts = {};
   dice.forEach(d => counts[d] = (counts[d] || 0) + 1);
   const sum = dice.reduce((a, b) => a + b, 0);
@@ -359,21 +488,22 @@ function calculateScore(categoryId, dice) {
     case 'fourKind':
       return Object.values(counts).some(c => c >= 4) ? sum : 0;
     
-    case 'fullHouse':
-      const hasThree = Object.values(counts).some(c => c === 3);
-      const hasTwo = Object.values(counts).some(c => c === 2);
-      return (hasThree && hasTwo) ? 25 : 0;
+    case 'fullHouse': {
+      const has3 = Object.values(counts).some(c => c === 3);
+      const has2 = Object.values(counts).some(c => c === 2);
+      return (has3 && has2) ? 25 : 0;
+    }
     
-    case 'smallStraight':
-      const sorted = [...new Set(dice)].sort();
-      const straights = [
-        [1,2,3,4], [2,3,4,5], [3,4,5,6]
-      ];
+    case 'smallStraight': {
+      const sorted = [...new Set(dice)].sort((a, b) => a - b);
+      const straights = [[1,2,3,4], [2,3,4,5], [3,4,5,6]];
       return straights.some(s => s.every(n => sorted.includes(n))) ? 30 : 0;
+    }
     
-    case 'largeStraight':
-      const sortedStr = dice.slice().sort().join('');
-      return (sortedStr === '12345' || sortedStr === '23456') ? 40 : 0;
+    case 'largeStraight': {
+      const str = dice.slice().sort().join('');
+      return (str === '12345' || str === '23456') ? 40 : 0;
+    }
     
     case 'yahtzee':
       return Object.values(counts).some(c => c === 5) ? 50 : 0;
@@ -384,297 +514,537 @@ function calculateScore(categoryId, dice) {
     default:
       return 0;
   }
-}
+};
 
-function getPlayerTotal(player) {
-  const scores = player === 'player' ? GameState.playerScores : GameState.cpuScores;
+Game.getTotal = function(player) {
+  const scores = player === 'player' ? this.state.playerScores : this.state.cpuScores;
   
-  // Upper section
-  let upperTotal = 0;
+  let upper = 0;
   ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes'].forEach(cat => {
-    if (scores[cat] !== undefined) upperTotal += scores[cat];
+    if (scores[cat] !== undefined) upper += scores[cat];
   });
   
-  // Upper bonus
-  const bonus = upperTotal >= 63 ? 35 : 0;
+  const bonus = upper >= 63 ? 35 : 0;
   
-  // Lower section
-  let lowerTotal = 0;
+  let lower = 0;
   ['threeKind', 'fourKind', 'fullHouse', 'smallStraight', 'largeStraight', 'yahtzee', 'chance'].forEach(cat => {
-    if (scores[cat] !== undefined) lowerTotal += scores[cat];
+    if (scores[cat] !== undefined) lower += scores[cat];
   });
   
-  return upperTotal + bonus + lowerTotal;
-}
+  return upper + bonus + lower;
+};
 
-// ==================== RENDERING ====================
-function renderScorecard() {
-  const container = document.getElementById('scoreRows');
+Game.handleCategoryClick = function(categoryId) {
+  if (this.state.playerScores[categoryId] !== undefined) return;
+  if (!this.state.gameActive) return;
+  if (this.state.currentTurn !== 'player') return;
+  if (this.state.playerRollsLeft >= 3) return;
+  
+  this.scoreCategory(categoryId, 'player');
+  
+  const score = this.state.playerScores[categoryId];
+  const catName = this.categories.find(c => c.id === categoryId).name;
+  this.setStatus(`You scored ${score} points in ${catName}! 🎯`);
+  
+  const rollBtn = document.getElementById('rollBtn');
+  if (rollBtn) rollBtn.disabled = true;
+  
+  setTimeout(() => {
+    if (this.isGameOver()) {
+      this.endGame();
+    } else {
+      this.cpuTurn();
+    }
+  }, 1000);
+};
+
+// ==================== GAME END ====================
+Game.isGameOver = function() {
+  const playerDone = this.categories.every(cat => 
+    this.state.playerScores[cat.id] !== undefined
+  );
+  const cpuDone = this.categories.every(cat => 
+    this.state.cpuScores[cat.id] !== undefined
+  );
+  return playerDone && cpuDone;
+};
+
+Game.endGame = function() {
+  this.state.gameActive = false;
+  
+  const playerTotal = this.getTotal('player');
+  const cpuTotal = this.getTotal('cpu');
+  const playerWon = playerTotal > cpuTotal;
+  
+  let result = '';
+  if (playerTotal > cpuTotal) {
+    result = `🎉 YOU WIN! ${playerTotal} - ${cpuTotal}`;
+    this.playSound('win');
+    this.showParticles();
+    this.state.stats.gamesWon++;
+  } else if (cpuTotal > playerTotal) {
+    result = `😞 CPU WINS ${cpuTotal} - ${playerTotal}`;
+    this.playSound('lose');
+  } else {
+    result = `🤝 TIE GAME! ${playerTotal} - ${playerTotal}`;
+  }
+  
+  const gameResult = document.getElementById('gameResult');
+  if (gameResult) gameResult.textContent = result;
+  
+  this.setStatus('Game Over! Tap New Game to play again.');
+  
+  // Update stats
+  this.state.stats.gamesPlayed++;
+  this.state.stats.totalScore += playerTotal;
+  this.saveStats();
+  
+  this.saveGameResult(playerTotal, cpuTotal, playerWon);
+  this.vibrate([100, 50, 100]);
+};
+
+// ==================== UI RENDERING ====================
+Game.renderScoreboard = function() {
+  const container = document.getElementById('scoreBody');
+  if (!container) return;
+  
   container.innerHTML = '';
   
   // Upper section
-  CATEGORIES.filter(c => c.upper).forEach(cat => {
-    const row = createScoreRow(cat);
-    container.appendChild(row);
+  this.categories.filter(c => c.type === 'upper').forEach(cat => {
+    container.appendChild(this.createScoreRow(cat));
   });
   
-  // Upper bonus
-  const bonusRow = createBonusRow();
-  container.appendChild(bonusRow);
+  // Bonus
+  container.appendChild(this.createBonusRow());
   
   // Lower section
-  CATEGORIES.filter(c => !c.upper).forEach(cat => {
-    const row = createScoreRow(cat);
-    container.appendChild(row);
+  this.categories.filter(c => c.type === 'lower').forEach(cat => {
+    container.appendChild(this.createScoreRow(cat));
   });
   
   // Total
-  const totalRow = createTotalRow();
-  container.appendChild(totalRow);
-}
+  container.appendChild(this.createTotalRow());
+};
 
-function createScoreRow(category) {
+Game.createScoreRow = function(category) {
   const row = document.createElement('div');
-  row.className = 'score-row';
-  row.classList.add(category.upper ? 'upper-section' : 'lower-section');
-  row.setAttribute('role', 'row');
+  row.className = 'score-row ' + category.type;
   
-  const playerScored = GameState.playerScores[category.id] !== undefined;
-  const cpuScored = GameState.cpuScores[category.id] !== undefined;
+  const playerScored = this.state.playerScores[category.id] !== undefined;
+  const cpuScored = this.state.cpuScores[category.id] !== undefined;
   
-  // Make clickable if player hasn't scored and has rolled
-  if (!playerScored && 
-      GameState.currentTurn === 'player' && 
-      GameState.playerRollsLeft < 3 && 
-      GameState.gameActive) {
+  // Make clickable if applicable
+  const isClickable = !playerScored && 
+                      this.state.currentTurn === 'player' && 
+                      this.state.playerRollsLeft < 3 && 
+                      this.state.gameActive;
+  
+  if (isClickable) {
     row.classList.add('clickable');
     
-    // Add click event
-    row.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      handleCategoryClick(category.id);
-    });
+    const potentialScore = this.calculateScore(category.id, this.state.playerDice);
+    row.title = `Score ${potentialScore} points`;
     
-    // Add touch event for better mobile support
+    row.addEventListener('click', () => this.handleCategoryClick(category.id));
     row.addEventListener('touchend', (e) => {
       e.preventDefault();
-      e.stopPropagation();
-      handleCategoryClick(category.id);
+      this.handleCategoryClick(category.id);
     });
-    
-    // Show potential score
-    const potentialScore = calculateScore(category.id, GameState.playerDice);
-    row.title = `Tap to score ${potentialScore} points`;
   }
   
   row.innerHTML = `
-    <div class="cell cat" role="cell">${category.name}</div>
-    <div class="cell you" role="cell">
-      ${playerScored ? GameState.playerScores[category.id] : '-'}
+    <div class="score-cell category-cell">${category.name}</div>
+    <div class="score-cell score-value ${playerScored ? 'player' : 'empty'}">
+      ${playerScored ? this.state.playerScores[category.id] : '-'}
     </div>
-    <div class="cell cpu" role="cell">
-      ${cpuScored ? GameState.cpuScores[category.id] : '-'}
+    <div class="score-cell score-value ${cpuScored ? 'cpu' : 'empty'}">
+      ${cpuScored ? this.state.cpuScores[category.id] : '-'}
     </div>
   `;
   
   return row;
-}
+};
 
-function createBonusRow() {
+Game.createBonusRow = function() {
   const row = document.createElement('div');
-  row.className = 'score-row bonus-row';
-  row.setAttribute('role', 'row');
+  row.className = 'score-row bonus';
   
   let playerUpper = 0;
   let cpuUpper = 0;
   
   ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes'].forEach(cat => {
-    if (GameState.playerScores[cat] !== undefined) {
-      playerUpper += GameState.playerScores[cat];
-    }
-    if (GameState.cpuScores[cat] !== undefined) {
-      cpuUpper += GameState.cpuScores[cat];
-    }
+    if (this.state.playerScores[cat]) playerUpper += this.state.playerScores[cat];
+    if (this.state.cpuScores[cat]) cpuUpper += this.state.cpuScores[cat];
   });
   
   const playerBonus = playerUpper >= 63 ? 35 : 0;
   const cpuBonus = cpuUpper >= 63 ? 35 : 0;
   
   row.innerHTML = `
-    <div class="cell cat" role="cell">Bonus (63+)</div>
-    <div class="cell you" role="cell">${playerBonus}</div>
-    <div class="cell cpu" role="cell">${cpuBonus}</div>
+    <div class="score-cell category-cell">Bonus (63+)</div>
+    <div class="score-cell score-value player">${playerBonus}</div>
+    <div class="score-cell score-value cpu">${cpuBonus}</div>
   `;
   
   return row;
-}
+};
 
-function createTotalRow() {
+Game.createTotalRow = function() {
   const row = document.createElement('div');
-  row.className = 'score-row total-row';
-  row.setAttribute('role', 'row');
+  row.className = 'score-row total';
   
-  const playerTotal = getPlayerTotal('player');
-  const cpuTotal = getPlayerTotal('cpu');
+  const playerTotal = this.getTotal('player');
+  const cpuTotal = this.getTotal('cpu');
   
   row.innerHTML = `
-    <div class="cell cat" role="cell">TOTAL</div>
-    <div class="cell you" role="cell">${playerTotal}</div>
-    <div class="cell cpu" role="cell">${cpuTotal}</div>
+    <div class="score-cell category-cell">TOTAL</div>
+    <div class="score-cell score-value player">${playerTotal}</div>
+    <div class="score-cell score-value cpu">${cpuTotal}</div>
   `;
   
   return row;
-}
+};
 
-function handleCategoryClick(categoryId) {
-  if (GameState.playerScores[categoryId] !== undefined) return;
-  if (!GameState.gameActive) return;
-  if (GameState.currentTurn !== 'player') return;
-  if (GameState.playerRollsLeft >= 3) return;
-  
-  scoreCategory(categoryId, 'player');
-  
-  const score = GameState.playerScores[categoryId];
-  const catName = CATEGORIES.find(c => c.id === categoryId).name;
-  updateStatus(`You scored ${score} in ${catName}!`);
-  
-  document.getElementById('playerRoll').disabled = true;
-  
-  setTimeout(() => {
-    if (checkGameOver()) {
-      endGame();
-    } else {
-      cpuTurn();
-    }
-  }, 1000);
-}
-
-function renderDice(player) {
-  const dice = player === 'player' ? GameState.playerDice : GameState.cpuDice;
-  const held = player === 'player' ? GameState.playerHeld : GameState.cpuHeld;
-  const container = document.getElementById(player === 'player' ? 'playerDice' : 'cpuDice');
+Game.updateDiceDisplay = function() {
+  const container = document.getElementById('diceContainer');
+  if (!container) return;
   
   container.innerHTML = '';
   
-  dice.forEach((value, index) => {
+  this.state.playerDice.forEach((value, index) => {
     const die = document.createElement('div');
     die.className = 'die';
-    die.setAttribute('data-value', value);
+    if (this.state.playerHeld[index]) die.classList.add('held');
     
-    if (held[index]) die.classList.add('held');
+    const number = document.createElement('span');
+    number.className = 'die-number';
+    number.textContent = value;
+    die.appendChild(number);
     
-    if (player === 'player') {
-      die.addEventListener('click', () => toggleHold('player', index));
-      die.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        toggleHold('player', index);
-      });
-    }
+    die.addEventListener('click', () => this.toggleHold(index));
+    die.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      this.toggleHold(index);
+    });
     
     container.appendChild(die);
   });
-}
+};
 
-function updateRollsDisplay() {
-  document.getElementById('playerRollsLeft').textContent = GameState.playerRollsLeft;
-  document.getElementById('cpuRollsLeft').textContent = GameState.cpuRollsLeft;
-}
+Game.updateRollsLeft = function() {
+  const rollsLeft = document.getElementById('rollsLeft');
+  if (rollsLeft) rollsLeft.textContent = this.state.playerRollsLeft;
+};
 
-function updateStatus(message) {
-  document.getElementById('status').textContent = message;
-}
-
-// ==================== GAME END ====================
-function checkGameOver() {
-  const allPlayerScored = CATEGORIES.every(cat => 
-    GameState.playerScores[cat.id] !== undefined
-  );
-  const allCpuScored = CATEGORIES.every(cat => 
-    GameState.cpuScores[cat.id] !== undefined
-  );
+Game.updateTurnIndicator = function() {
+  const indicator = document.getElementById('turnIndicator');
+  if (!indicator) return;
   
-  return allPlayerScored && allCpuScored;
-}
-
-function endGame() {
-  GameState.gameActive = false;
+  const text = indicator.querySelector('.turn-text');
+  if (!text) return;
   
-  const playerTotal = getPlayerTotal('player');
-  const cpuTotal = getPlayerTotal('cpu');
-  
-  let result = '';
-  if (playerTotal > cpuTotal) {
-    result = `🎉 You Win! ${playerTotal} - ${cpuTotal}`;
-    playSound('win');
-    showParticles();
-  } else if (cpuTotal > playerTotal) {
-    result = `CPU Wins! ${cpuTotal} - ${playerTotal}`;
-    playSound('lose');
+  if (this.state.currentTurn === 'player') {
+    text.textContent = 'Your Turn';
+    indicator.style.background = 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)';
   } else {
-    result = `Tie Game! ${playerTotal} - ${playerTotal}`;
+    text.textContent = 'CPU Turn';
+    indicator.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
   }
-  
-  document.getElementById('finalScore').textContent = result;
-  updateStatus('Game Over! Click Menu to play again.');
-  
-  // Save to history
-  saveGameResult(playerTotal, cpuTotal, playerTotal > cpuTotal);
-  
-  vibrate([100, 50, 100]);
-}
+};
 
-// ==================== HISTORY & STORAGE ====================
-function saveGameResult(playerScore, cpuScore, playerWon) {
+Game.setStatus = function(message) {
+  const statusText = document.getElementById('statusText');
+  if (statusText) statusText.textContent = message;
+};
+    this.renderScoreboard(); // Update clickable categories
+  }, 300);
+};
+
+Game.rollDie = function() {
+  return Math.floor(Math.random() * 6) + 1;
+};
+
+Game.toggleHold = function(index) {
+  if (this.state.playerRollsLeft < 3 && this.state.gameActive && this.state.currentTurn === 'player') {
+    this.state.playerHeld[index] = !this.state.playerHeld[index];
+    this.updateDiceDisplay();
+    this.playSound('hold');
+    this.vibrate(30);
+  }
+};
+
+Game.isYahtzee = function(dice) {
+  return dice.every(d => d === dice[0]);
+};
+    
+
+// ==================== STORAGE ====================
+Game.saveGameResult = function(playerScore, cpuScore, playerWon) {
   const result = {
     date: new Date().toISOString(),
     playerScore,
     cpuScore,
     playerWon,
-    difficulty: GameState.difficulty
+    difficulty: this.state.difficulty
   };
   
-  GameState.history.unshift(result);
-  if (GameState.history.length > 20) GameState.history.pop();
+  this.state.history.unshift(result);
+  if (this.state.history.length > 50) this.state.history = this.state.history.slice(0, 50);
   
   // Update high scores
-  if (!GameState.highScores.find(s => s.score === playerScore) || GameState.highScores.length < 10) {
-    GameState.highScores.push({ score: playerScore, date: result.date });
-    GameState.highScores.sort((a, b) => b.score - a.score);
-    GameState.highScores = GameState.highScores.slice(0, 10);
+  const existing = this.state.highScores.find(s => s.score === playerScore);
+  if (!existing && this.state.highScores.length < 10) {
+    this.state.highScores.push({ score: playerScore, date: result.date });
+    this.state.highScores.sort((a, b) => b.score - a.score);
+  } else if (!existing) {
+    if (playerScore > this.state.highScores[9].score) {
+      this.state.highScores[9] = { score: playerScore, date: result.date };
+      this.state.highScores.sort((a, b) => b.score - a.score);
+    }
   }
   
-  localStorage.setItem('dopeDiceHistory', JSON.stringify(GameState.history));
-  localStorage.setItem('dopeDiceHighScores', JSON.stringify(GameState.highScores));
-}
+  localStorage.setItem('dopeDiceHistory', JSON.stringify(this.state.history));
+  localStorage.setItem('dopeDiceHighScores', JSON.stringify(this.state.highScores));
+};
 
-function loadHistory() {
+Game.loadHistory = function() {
   try {
     const history = localStorage.getItem('dopeDiceHistory');
     const highScores = localStorage.getItem('dopeDiceHighScores');
     
-    if (history) GameState.history = JSON.parse(history);
-    if (highScores) GameState.highScores = JSON.parse(highScores);
+    if (history) this.state.history = JSON.parse(history);
+    if (highScores) this.state.highScores = JSON.parse(highScores);
     
-    renderHistory();
+    this.renderHistory();
   } catch (e) {
     console.error('Error loading history:', e);
   }
-}
+};
 
-function renderHistory() {
+Game.renderHistory = function() {
   const historyList = document.getElementById('historyList');
   const highScoresList = document.getElementById('highScoresList');
   
-  if (GameState.history.length === 0) {
-    historyList.innerHTML = '<div class="muted">No games played yet</div>';
-  } else {
-    historyList.innerHTML = GameState.history.slice(0, 10).map(game => {
-      const date = new Date(game.date).toLocaleDateString();
-      const result = game.playerWon ? '🏆 Win' : '❌ Loss';
-      return `
-        <div class="history-item">
-          <strong>${result}</strong> - ${game.playerScore} vs ${game.cpuScore}
-          <br><small>${date} • ${game.difficulty}</small>
-        </div>
+  if (historyList) {
+    if (this.state.history.length === 0) {
+      historyList.innerHTML = '<div style="text-align:center;color:#808080;padding:20px;font-style:italic;">No games played yet</div>';
+    } else {
+      historyList.innerHTML = this.state.history.slice(0, 10).map(game => {
+        const date = new Date(game.date).toLocaleDateString();
+        const result = game.playerWon ? '🏆 Win' : '❌ Loss';
+        return `
+          <div class="history-item">
+            <strong>${result}</strong> - ${game.playerScore} vs ${game.cpuScore}
+            <br><small>${date} • ${game.difficulty}</small>
+          </div>
+        `;
+      }).join('');
+    }
+  }
   
+  if (highScoresList) {
+    if (this.state.highScores.length === 0) {
+      highScoresList.innerHTML = '<div style="text-align:center;color:#808080;padding:20px;font-style:italic;">No high scores yet</div>';
+    } else {
+      highScoresList.innerHTML = this.state.highScores.map((score, i) => {
+        const date = new Date(score.date).toLocaleDateString();
+        return `
+          <div class="highscore-item">
+            <strong>#${i + 1}</strong> - ${score.score} points
+            <br><small>${date}</small>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+};
+
+Game.clearHistory = function() {
+  if (confirm('Clear all game history and high scores?')) {
+    this.state.history = [];
+    this.state.highScores = [];
+    localStorage.removeItem('dopeDiceHistory');
+    localStorage.removeItem('dopeDiceHighScores');
+    this.renderHistory();
+    this.playSound('click');
+  }
+};
+
+Game.saveSettings = function() {
+  localStorage.setItem('dopeDiceSettings', JSON.stringify(this.state.settings));
+  localStorage.setItem('dopeDiceDifficulty', this.state.difficulty);
+};
+
+Game.loadSettings = function() {
+  try {
+    const settings = localStorage.getItem('dopeDiceSettings');
+    const difficulty = localStorage.getItem('dopeDiceDifficulty');
+    
+    if (settings) {
+      this.state.settings = JSON.parse(settings);
+      
+      const soundToggle = document.getElementById('soundToggle');
+      if (soundToggle) soundToggle.value = this.state.settings.sound ? 'on' : 'off';
+      
+      const vibrationToggle = document.getElementById('vibrationToggle');
+      if (vibrationToggle) vibrationToggle.value = this.state.settings.vibration ? 'on' : 'off';
+      
+      const themeToggle = document.getElementById('themeToggle');
+      if (themeToggle) themeToggle.value = this.state.settings.theme;
+      
+      this.applyTheme(this.state.settings.theme);
+    }
+    
+    if (difficulty) {
+      this.state.difficulty = difficulty;
+      const difficultySelect = document.getElementById('difficulty');
+      if (difficultySelect) difficultySelect.value = difficulty;
+    }
+  } catch (e) {
+    console.error('Error loading settings:', e);
+  }
+};
+
+Game.saveStats = function() {
+  localStorage.setItem('dopeDiceStats', JSON.stringify(this.state.stats));
+};
+
+Game.loadStats = function() {
+  try {
+    const stats = localStorage.getItem('dopeDiceStats');
+    if (stats) this.state.stats = JSON.parse(stats);
+  } catch (e) {
+    console.error('Error loading stats:', e);
+  }
+};
+
+// ==================== THEME ====================
+Game.applyTheme = function(theme) {
+  const root = document.documentElement;
+  
+  if (theme === 'dark') {
+    root.style.setProperty('--primary', '#1abc9c');
+    root.style.setProperty('--primary-dark', '#16a085');
+  } else if (theme === 'purple') {
+    root.style.setProperty('--primary', '#9b59b6');
+    root.style.setProperty('--primary-dark', '#8e44ad');
+  } else {
+    root.style.setProperty('--primary', '#2ecc71');
+    root.style.setProperty('--primary-dark', '#27ae60');
+  }
+};
+
+// ==================== AUDIO & HAPTICS ====================
+Game.playSound = function(type) {
+  if (!this.state.settings.sound) return;
+  
+  const frequencies = {
+    roll: 200,
+    hold: 300,
+    score: 400,
+    win: 500,
+    lose: 150,
+    click: 250,
+    start: 350
+  };
+  
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = frequencies[type] || 300;
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.1);
+  } catch (e) {
+    // Audio not supported
+  }
+};
+
+Game.vibrate = function(pattern) {
+  if (!this.state.settings.vibration) return;
+  if ('vibrate' in navigator) {
+    navigator.vibrate(pattern);
+  }
+};
+
+// ==================== PARTICLES ====================
+Game.showParticles = function() {
+  const canvas = document.getElementById('particleCanvas');
+  if (!canvas) return;
+  
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  canvas.classList.add('active');
+  
+  const particles = [];
+  for (let i = 0; i < 80; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 0.5) * 6,
+      size: Math.random() * 10 + 4,
+      color: `hsl(${Math.random() * 60 + 100}, 80%, 60%)`
+    });
+  }
+  
+  let frame = 0;
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.2;
+      
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    
+    frame++;
+    if (frame < 200) {
+      requestAnimationFrame(animate);
+    } else {
+      canvas.classList.remove('active');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+  
+  animate();
+};
+
+// ==================== UTILITIES ====================
+// Prevent double-tap zoom
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  if (now - lastTouchEnd <= 300) {
+    e.preventDefault();
+  }
+  lastTouchEnd = now;
+}, false);
+
+// Window resize handler
+window.addEventListener('resize', () => {
+  const canvas = document.getElementById('particleCanvas');
+  if (canvas) {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+});
+
+// Log ready
+console.log('🍃 Dope Dice v2.0 Enhanced - Ready to Roll! 🎲');
