@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Dope Dice</title>
+
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#2b7a2b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="icon" href="./icon.png" />
+  <link rel="apple-touch-icon" href="./icon.png" />
+
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app">
+    <div class="splash" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <div class="title">
+        <img src="./icon.png" alt="Dope Dice icon" class="app-icon" />
+        <h1 id="appTitle">Dope Dice</h1>
+      </div>
+
+      <div class="controls" role="toolbar" aria-label="Top controls">
+        <label for="difficulty" class="visually-hidden">CPU Difficulty</label>
+        <select id="difficulty" aria-label="CPU Difficulty">
+          <option value="easy">Easy</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+
+        <button id="historyBtn" type="button" title="Match history">
+          <span class="btn-icon">📊</span>
+        </button>
+        <button id="openStart" type="button" title="Menu">
+          <span class="btn-icon">☰</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="game-area" id="gameArea" aria-live="polite">
+      <!-- Vertical Scorecard -->
+      <aside class="scoreboard-wrapper" role="region" aria-label="Scorecard">
+        <div class="scorecard" id="scorecard" role="table" aria-label="Scorecard">
+          <div class="score-row score-header-row" role="row">
+            <div class="cell cat" role="columnheader">Category</div>
+            <div class="cell you" role="columnheader">You</div>
+            <div class="cell cpu" role="columnheader">CPU</div>
+          </div>
+          <div class="score-rows" id="scoreRows" role="rowgroup"></div>
+        </div>
+      </aside>
+
+      <!-- Player Dice Area -->
+      <section class="player-panel" id="playerPanel" aria-label="Player area">
+        <h2>Your Turn</h2>
+        <div class="dice-row" id="playerDice" aria-label="Player dice"></div>
+        <div class="roll-controls">
+          <button id="playerRoll" type="button" class="roll-btn" aria-label="Roll dice">
+            🎲 Roll Dice
+          </button>
+          <div class="rolls-left">
+            Rolls left: <span id="playerRollsLeft" class="rolls-count">3</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- CPU panel (hidden, for compatibility) -->
+      <section class="player-panel cpu-hidden" id="cpuPanel" aria-label="CPU area">
+        <h2>CPU</h2>
+        <div class="dice-row" id="cpuDice" aria-label="CPU dice"></div>
+        <div class="roll-controls">
+          <button id="cpuRoll" type="button" disabled aria-hidden="true">CPU Roll</button>
+          <div class="rolls-left">Rolls left: <span id="cpuRollsLeft">3</span></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <div id="status">Ready to play</div>
+      <div class="final-score" id="finalScore" aria-live="polite"></div>
+    </footer>
+  </div>
+
+  <canvas id="particleCanvas" class="particle-canvas" aria-hidden="true"></canvas>
+
+  <!-- Overlays -->
+  <div id="overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-hidden="true">
+    <!-- Start Panel -->
+    <div class="panel start-panel" id="startPanel" role="document">
+      <img src="./icon.png" alt="" class="start-icon" />
+      <h2>Dope Dice</h2>
+      <p class="lead">Weed-themed Yahtzee vibes<br>Player vs CPU</p>
+
+      <div class="start-buttons" role="group" aria-label="Start menu">
+        <button id="btnPlay" class="primary" type="button">🎮 Play Game</button>
+        <button id="btnSettings" type="button">⚙️ Settings</button>
+        <button id="btnAbout" type="button">ℹ️ About</button>
+      </div>
+
+      <div class="credits">Tip: Install as app for offline play</div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="panel settings-panel hidden" id="settingsPanel" role="document" aria-hidden="true">
+      <h3>⚙️ Settings</h3>
+
+      <div class="setting-group">
+        <label for="gameType">Game Mode</label>
+        <select id="gameType" aria-label="Game type">
+          <option value="classic">Classic Yahtzee</option>
+          <option value="lucky7">Lucky 7</option>
+          <option value="speed">Speed Mode</option>
+        </select>
+      </div>
+
+      <div class="setting-group">
+        <label for="sfxToggle">Sound Effects</label>
+        <select id="sfxToggle" aria-label="Sound toggle">
+          <option value="on" selected>On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+
+      <div class="setting-group">
+        <label for="vibrationToggle">Vibration</label>
+        <select id="vibrationToggle" aria-label="Vibration toggle">
+          <option value="on" selected>On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+
+      <div class="settings-actions">
+        <button id="settingsBack" type="button" class="btn-back">← Back</button>
+      </div>
+    </div>
+
+    <!-- About Panel -->
+    <div class="panel about-panel hidden" id="aboutPanel" role="document" aria-hidden="true">
+      <h3>ℹ️ About</h3>
+      <p class="lead">Dope Dice is a Yahtzee-style scoring game with a relaxing weed theme.</p>
+      
+      <div class="about-content">
+        <h4>How to Play:</h4>
+        <ul>
+          <li>Roll dice up to 3 times per turn</li>
+          <li>Tap dice to hold them between rolls</li>
+          <li>Score in 13 categories</li>
+          <li>Beat the CPU to win!</li>
+        </ul>
+
+        <h4>Scoring:</h4>
+        <ul>
+          <li><strong>Upper:</strong> Sum of matching numbers</li>
+          <li><strong>Bonus:</strong> 35 pts if upper ≥ 63</li>
+          <li><strong>3/4 of a Kind:</strong> Sum of all dice</li>
+          <li><strong>Full House:</strong> 25 points</li>
+          <li><strong>Small/Large Straight:</strong> 30/40 pts</li>
+          <li><strong>Yahtzee:</strong> 50 points!</li>
+          <li><strong>Chance:</strong> Sum of all dice</li>
+        </ul>
+      </div>
+
+      <div class="settings-actions">
+        <button id="aboutBack" type="button" class="btn-back">← Back</button>
+      </div>
+    </div>
+
+    <!-- History Panel -->
+    <div class="panel history-panel hidden" id="historyPanel" role="document" aria-hidden="true">
+      <h3>📊 Match History</h3>
+      
+      <h4>Recent Games</h4>
+      <div id="historyList" class="history-list"></div>
+      
+      <h4>High Scores</h4>
+      <div id="highScoresList" class="highscore-list"></div>
+      
+      <div class="settings-actions">
+        <button id="clearHistory" type="button" class="btn-danger">Clear History</button>
+        <button id="historyBack" type="button" class="btn-back">← Back</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
