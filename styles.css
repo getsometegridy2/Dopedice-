@@ -14,9 +14,9 @@
   --accent-dark: #558b2f;
   
   /* UI Colors */
-  --bg: #1a1a1a;
-  --bg-light: #2a2a2a;
-  --bg-lighter: #3a3a3a;
+  --bg: #0a0a0a;
+  --bg-light: #1a1a1a;
+  --bg-lighter: #2a2a2a;
   --text: #e0e0e0;
   --text-dim: #a0a0a0;
   --border: #444;
@@ -26,8 +26,8 @@
   --cpu-color: #ff6b6b;
   
   /* Dice */
-  --dice-bg: #f5f5f5;
-  --dice-pip: #2b7a2b;
+  --dice-bg: #2b7a2b;
+  --dice-number: #ffffff;
   --dice-held: #7cb342;
   
   /* Spacing */
@@ -59,6 +59,7 @@ html, body {
   width: 100%;
   height: 100%;
   position: relative;
+  background: var(--bg);
 }
 
 /* ==================== SPLASH SCREEN ==================== */
@@ -68,9 +69,11 @@ html, body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 50%, var(--accent) 100%);
-  background-size: 200% 200%;
-  animation: gradientShift 3s ease infinite;
+  background-image: url('./splash.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #1a3a1a;
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -81,19 +84,38 @@ html, body {
 }
 
 .splash::before {
-  content: '🍃';
-  font-size: 80px;
-  animation: float 2s ease-in-out infinite;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(43, 122, 43, 0.3) 0%, rgba(30, 90, 30, 0.3) 100%);
+  animation: pulse 2s ease-in-out infinite;
 }
 
-@keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+.splash::after {
+  content: '🎲';
+  position: relative;
+  font-size: 80px;
+  z-index: 1;
+  animation: float 2s ease-in-out infinite;
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
 }
 
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-20px); }
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
 /* ==================== HEADER ==================== */
@@ -185,7 +207,7 @@ html, body {
   overflow-x: hidden;
   padding: var(--spacing-md);
   gap: var(--spacing-md);
-  background: var(--bg);
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
 }
 
 /* ==================== VERTICAL SCOREBOARD ==================== */
@@ -209,11 +231,12 @@ html, body {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
   gap: var(--spacing-xs);
-  padding: var(--spacing-sm);
+  padding: var(--spacing-md);
   background: var(--bg-lighter);
   border-radius: 6px;
   align-items: center;
-  min-height: 44px;
+  min-height: 48px;
+  transition: all 0.3s ease;
 }
 
 .score-header-row {
@@ -230,6 +253,7 @@ html, body {
 .cell {
   text-align: center;
   padding: var(--spacing-xs);
+  font-size: 1rem;
 }
 
 .cell.cat {
@@ -239,27 +263,27 @@ html, body {
 
 .cell.you {
   color: var(--player-color);
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 1.1rem;
 }
 
 .cell.cpu {
   color: var(--cpu-color);
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 1.1rem;
 }
 
 .score-row.clickable {
   cursor: pointer;
-  transition: all 0.2s ease;
+  border: 2px solid transparent;
 }
 
-.score-row.clickable:hover {
+.score-row.clickable:hover,
+.score-row.clickable:active {
   background: var(--primary-dark);
   transform: scale(1.02);
-  box-shadow: 0 2px 8px rgba(43, 122, 43, 0.3);
-}
-
-.score-row.clickable:active {
-  transform: scale(0.98);
+  box-shadow: 0 4px 12px rgba(43, 122, 43, 0.5);
+  border: 2px solid var(--primary-light);
 }
 
 .score-row.selected {
@@ -268,11 +292,11 @@ html, body {
 }
 
 .score-row.upper-section {
-  border-left: 3px solid var(--accent);
+  border-left: 4px solid var(--accent);
 }
 
 .score-row.lower-section {
-  border-left: 3px solid var(--primary-light);
+  border-left: 4px solid var(--primary-light);
 }
 
 .score-row.bonus-row,
@@ -286,7 +310,7 @@ html, body {
 .score-row.total-row {
   background: var(--primary-dark);
   color: #fff;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   margin-top: var(--spacing-sm);
 }
 
@@ -312,31 +336,50 @@ html, body {
   display: none;
 }
 
-/* ==================== DICE ==================== */
+/* ==================== DICE WITH POT LEAF DESIGN ==================== */
 .dice-row {
   display: flex;
   justify-content: center;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
   flex-wrap: wrap;
   margin-bottom: var(--spacing-lg);
-  min-height: 80px;
+  min-height: 90px;
 }
 
 .die {
-  width: 60px;
-  height: 60px;
-  background: var(--dice-bg);
-  border-radius: 10px;
+  width: 70px;
+  height: 70px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent-dark) 100%);
+  border-radius: 12px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-  border: 3px solid transparent;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+  border: 3px solid var(--primary-dark);
   position: relative;
   user-select: none;
+  padding: 8px;
+}
+
+.die::before {
+  content: '🍃';
+  font-size: 2rem;
+  position: absolute;
+  opacity: 0.3;
+  z-index: 0;
+}
+
+.die::after {
+  content: attr(data-value);
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--dice-number);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  z-index: 1;
+  position: relative;
 }
 
 .die:active {
@@ -344,15 +387,21 @@ html, body {
 }
 
 .die.held {
-  background: var(--dice-held);
-  border-color: var(--accent-dark);
-  box-shadow: 0 0 16px rgba(124, 179, 66, 0.6);
-  animation: pulse 1s ease-in-out infinite;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--primary-light) 100%);
+  border-color: #fff;
+  box-shadow: 0 0 20px rgba(124, 179, 66, 0.8);
+  animation: pulse-glow 1s ease-in-out infinite;
 }
 
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+@keyframes pulse-glow {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(124, 179, 66, 0.8);
+  }
+  50% { 
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(124, 179, 66, 1);
+  }
 }
 
 .die.rolling {
@@ -361,25 +410,9 @@ html, body {
 
 @keyframes rollDice {
   0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(90deg); }
-  50% { transform: rotate(180deg); }
-  75% { transform: rotate(270deg); }
-}
-
-/* Pip Display */
-.die.pip-display {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-  padding: 8px;
-  gap: 4px;
-}
-
-.pip {
-  width: 10px;
-  height: 10px;
-  background: var(--dice-pip);
-  border-radius: 50%;
+  25% { transform: rotate(90deg) scale(1.1); }
+  50% { transform: rotate(180deg) scale(0.9); }
+  75% { transform: rotate(270deg) scale(1.1); }
 }
 
 /* ==================== ROLL CONTROLS ==================== */
@@ -390,7 +423,8 @@ html, body {
   align-items: center;
 }
 
-.roll-btn {
+.roll-btn,
+#playerRoll {
   width: 100%;
   max-width: 300px;
   padding: var(--spacing-md) var(--spacing-lg);
@@ -407,16 +441,19 @@ html, body {
   letter-spacing: 1px;
 }
 
-.roll-btn:hover {
+.roll-btn:hover,
+#playerRoll:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(43, 122, 43, 0.6);
 }
 
-.roll-btn:active {
+.roll-btn:active,
+#playerRoll:active {
   transform: translateY(0);
 }
 
-.roll-btn:disabled {
+.roll-btn:disabled,
+#playerRoll:disabled {
   background: var(--bg-lighter);
   color: var(--text-dim);
   cursor: not-allowed;
@@ -425,14 +462,14 @@ html, body {
 
 .rolls-left {
   font-size: 1.1rem;
-  color: var(--text-dim);
+  color: var(--text);
   font-weight: 500;
 }
 
 .rolls-count {
   color: var(--accent);
   font-weight: 700;
-  font-size: 1.3rem;
+  font-size: 1.4rem;
 }
 
 /* ==================== FOOTER ==================== */
@@ -450,6 +487,7 @@ html, body {
 #status {
   font-weight: 500;
   color: var(--text);
+  font-size: 0.95rem;
 }
 
 .final-score {
@@ -482,7 +520,7 @@ html, body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.9);
+  background: rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 2000;
@@ -760,9 +798,16 @@ html, body {
   }
   
   .die {
-    width: 50px;
-    height: 50px;
+    width: 60px;
+    height: 60px;
+  }
+  
+  .die::before {
     font-size: 1.5rem;
+  }
+  
+  .die::after {
+    font-size: 1.8rem;
   }
   
   .panel {
@@ -808,4 +853,5 @@ html, body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
-}
+  }
+    
